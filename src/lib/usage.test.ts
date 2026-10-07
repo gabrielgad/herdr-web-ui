@@ -39,9 +39,16 @@ describe("usage meters", () => {
     expect(glanceWindow(provider("grok", []), "week")).toBeNull();
   });
 
-  it("keeps the server's order until the user arranges the accounts", () => {
+  it("keeps the server's order until the user arranges the accounts, accounts with a meter first", () => {
     const order = orderProviders([provider("claude", []), provider("codex", [window(40)]), provider("copilot", [window(90, "month")])]);
-    expect(order.map((usage) => usage.id)).toEqual(["claude", "codex", "copilot"]);
+    expect(order.map((usage) => usage.id)).toEqual(["codex", "copilot", "claude"]);
+    // a locked account does not take the place of one that reports
+    const locked = orderProviders([provider("claude", [window(10)]), provider("claude", [], "#1"), provider("claude", [], "#2"), provider("antigravity", [window(98)]), provider("cursor", [window(11, "month")])]);
+    expect(locked.map((usage) => usage.id)).toEqual(["claude", "antigravity", "cursor", "claude", "claude"]);
+  });
+  it("puts a meter the user ranked ahead of the rest, locked or not", () => {
+    const providers = [provider("claude", [window(10)]), provider("claude", [], "#1")];
+    expect(orderProviders(providers, ["claude:#1"]).map((usage) => usage.key)).toEqual(["claude:#1", "claude"]);
   });
 
   it("follows the user's order first, then the server's", () => {

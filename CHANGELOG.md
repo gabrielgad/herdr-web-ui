@@ -72,6 +72,7 @@ between releases do not reach them. Remote-PC runtime bundles are versioned sepa
   is, also when the pane is kept on the terminal. The pane's own view is not changed: pick the
   pane or a view yourself and it is back. A shell's notification opens its terminal as before.
   ([#605](https://github.com/devswha/herdr-web-ui/pull/605) by @Xianbei233)
+- The usage strip lists accounts with a meter before locked or signed-out ones, so those no longer fold the rest into "+N".
 
 ## [0.4.1] - 2026-10-08
 

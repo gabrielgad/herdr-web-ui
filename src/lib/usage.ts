@@ -96,14 +96,17 @@ export function formatPercent(value: number): string {
   return value > 0 && value < 1 ? `${value.toFixed(1)}%` : `${Math.round(value)}%`;
 }
 
-/** The accounts in the user's order (`order`, by key), then the rest as the server lists them. */
+/** The accounts in the user's order (`order`, by key), then the rest as the server lists them, those with a meter first. */
 export function orderProviders(providers: readonly ProviderUsage[], order: readonly string[] = []): ProviderUsage[] {
   const rank = new Map(order.map((key, index) => [key, index]));
   return [...providers].sort((a, b) => {
     const ranked = [rank.get(a.key), rank.get(b.key)];
     if (ranked[0] !== undefined && ranked[1] !== undefined) return ranked[0] - ranked[1];
     if (ranked[0] !== undefined || ranked[1] !== undefined) return ranked[0] !== undefined ? -1 : 1;
-    return 0;
+    // accounts that report nothing (locked, signed out) after the ones that do, so they never
+    // take the strip's few places from an account with a meter
+    const reports = (usage: ProviderUsage): number => usage.windows.length > 0 ? 0 : 1;
+    return reports(a) - reports(b);
   });
 }
 
