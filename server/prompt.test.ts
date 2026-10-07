@@ -388,6 +388,32 @@ Enter to select · ↑/↓ to navigate · Esc to cancel
     expect(answerKeys(alone!, { option_indices: [1] })).toEqual([{ keys: ["down"] }, { keys: ["enter"] }, { keys: ["right"] }]);
   });
 
+  test("reads Claude's fetch approval, whose panel ends on its last row with no hint line", () => {
+    const rule = "─".repeat(40);
+    const dashes = "╌".repeat(40);
+    const fetch = (selected: number) => `
+● Fetch(https://example.com)
+${rule}
+ Fetch
+ Claude wants to fetch content from example.com
+${dashes}
+ url: https://example.com/
+ prompt: What is the page title?
+${dashes}
+ Do you want to allow Claude to fetch this content?
+ ${selected === 1 ? "❯" : " "} 1. Yes
+ ${selected === 2 ? "❯" : " "} 2. Yes, and don't ask again for example.com
+ ${selected === 3 ? "❯" : " "} 3. No, and tell Claude what to do differently (esc)
+`;
+    const prompt = parseInteractivePrompt("claude", fetch(1))!;
+    expect(prompt.kind).toBe("approval");
+    expect(prompt.title).toBe("Fetch");
+    expect(labels(prompt)).toEqual(["Yes", "Yes, and don't ask again for example.com", "No, and tell Claude what to do differently (esc)"]);
+    expect(parseInteractivePrompt("claude", fetch(3))?.id).toBe(prompt.id);
+    // answered: Claude's next output under the panel leaves no card
+    expect(parseInteractivePrompt("claude", `${fetch(1)}\n● Fetched it.\n`)).toBeNull();
+  });
+
   test("titles a Claude approval from its panel, not from rules in a file preview, and joins labels wrapped over lines", () => {
     const edit = parseInteractivePrompt("claude", `
 ● Write(notes.md)
