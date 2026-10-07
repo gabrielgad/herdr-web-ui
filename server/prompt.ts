@@ -2276,7 +2276,7 @@ export function answerKeys(prompt: InteractivePrompt, answer: Pick<PromptAnswer,
 const ASKED_RE = /\?\s*(?:[([][^)\]]*[)\]])?\s*$/;
 /** a (y/n) hint ending its line, as a prompt does; a mention mid-sentence or quoted does not */
 const YES_NO_RE = /[([]\s*y(?:es)?\s*\/\s*n(?:o)?\s*[)\]]\s*[:?]?\s*$/i;
-const ARROWS_RE = /[↑↓]|\barrow keys\b/i;
+const ARROWS_RE = /[↑↓]|\barrow keys\b|\bup\/down\b/i;
 /**
  * what a menu's hint line says to do with it: a way to choose ("Enter to select", "↵ choose",
  * "Enter a number", "Type 1-3", "↑/↓ to move"). A plain Enter or Press asks for something else
@@ -2730,7 +2730,10 @@ async function readPrompt(paneId: string, codexHome?: string): Promise<{ agent: 
   // an omo form just answered has closed, while herdr still reports the wait for a moment: that
   // is no screen to answer, and its fallback card would flash up after the form's last answer
   const settling = Date.now() - (formsAnswered.get(paneId) ?? 0) < FORM_SETTLE_MS;
-  if (known.prompt !== null || status !== "blocked" || !agent || settling) {
+  // pi marks itself blocked only for the dialogs that say so: an extension's own picker or editor
+  // (`ui.custom`, `ui.editor`) leaves it idle, while the screen shows its key hint
+  const piDialog = known.prompt === null && agent === "pi" && status !== "blocked" && !settling && known.screen !== undefined && piDialogWaits(known.screen);
+  if (!piDialog && (known.prompt !== null || status !== "blocked" || !agent || settling)) {
     fallbackLogged.delete(paneId);
     return { agent, status, prompt: asked(paneId, known.prompt, turns), pane, panes };
   }
@@ -2743,12 +2746,43 @@ async function readPrompt(paneId: string, codexHome?: string): Promise<{ agent: 
     fallbackLogged.delete(paneId);
     return { agent, status, prompt: asked(paneId, null, turns), pane, panes };
   }
-  const prompt = asked(paneId, parseFallbackPrompt(agent, screen), turns)!;
+  const fallback = parseFallbackPrompt(agent, piDialog ? piDialogScreen(screen) ?? screen : screen);
+  // the dialog's own title, as the card's question, where the hint line would be
+  if (piDialog) fallback.question = fallback.body?.split("\n").find((line) => line.trim() !== "") ?? fallback.question;
+  const prompt = asked(paneId, fallback, turns)!;
   if (!fallbackLogged.has(paneId) && fallbackLogged.size < FALLBACK_LOGGED_MAX) {
     fallbackLogged.add(paneId);
     console.warn(`prompt: ${agent} pane ${paneId} is blocked on a screen no reader knows; fallback card (${prompt.options.length} options)`);
   }
   return { agent, status, prompt, pane, panes };
+}
+
+/**
+ * A pi dialog no reader knows (an extension's picker or editor) waiting under its key hint: a
+ * line naming Enter and Esc, or Esc to cancel, in the last few lines, with only pi's footer under it.
+ */
+const PI_DIALOG_HINT_RE = /\b(?:enter|return)\b.*\b(?:esc|escape)\b|\b(?:esc|escape)\b.*\bcancel/i;
+export function piDialogWaits(screen: string): boolean {
+  return piDialogScreen(screen) !== null;
+}
+
+/** The dialog's own lines, up to its key hint: pi's footer under the hint is not part of it. */
+export function piDialogScreen(screen: string): string | null {
+  const lines = screen.replace(ANSI_RE, "").split(/\r?\n/);
+  const shown = lines.flatMap((line, index) => cleanLine(line) && !isDivider(line) ? [index] : []);
+  const hint = [...shown.slice(-5)].reverse().find((index) => {
+    const line = cleanLine(lines[index]!);
+    // pi's own select, input and model list have readers: a redraw of one that ended is not a new dialog
+    return !NOT_PROMPT_TEXT_RE.test(line) && line.length < 160 && PI_DIALOG_HINT_RE.test(line)
+      && !PI_MENU_HINT_RE.test(line) && !PI_INPUT_HINT_RE.test(line) && !PI_MODEL_HINT_RE.test(line);
+  });
+  if (hint === undefined) return null;
+  // the dialog opens under the third rule up (the editor's frame: title, text, hint between rules)
+  // or, with fewer near, a few lines up
+  const from = Math.max(0, hint - 12);
+  const rules = lines.slice(from, hint).flatMap((line, index) => isDivider(line) ? [from + index] : []);
+  const start = rules.length >= 3 ? rules.at(-3)! + 1 : Math.max(0, hint - 8);
+  return lines.slice(start, hint + 1).join("\n");
 }
 
 /**

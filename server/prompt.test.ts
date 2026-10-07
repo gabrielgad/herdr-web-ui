@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { InteractivePrompt } from "../shared/protocol.ts";
 
-import { answerKeys, removedInvisible, noteSubmitted, codexQuestionsCollapsed, codexQueuedPrompt, handlePromptRequest, modelListWaits, openOmoAsks, parseClaudeSuggestion, parseFallbackPrompt, parseInteractivePrompt, pendingOmoAsk, promptWaitEnded } from "./prompt.ts";
+import { answerKeys, removedInvisible, noteSubmitted, codexQuestionsCollapsed, codexQueuedPrompt, handlePromptRequest, modelListWaits, openOmoAsks, piDialogScreen, parseClaudeSuggestion, parseFallbackPrompt, parseInteractivePrompt, pendingOmoAsk, promptWaitEnded } from "./prompt.ts";
 
 const labels = (prompt: InteractivePrompt | null) => prompt?.options.map((option) => option.label);
 
@@ -4055,5 +4055,27 @@ Enter to select · ↑/↓ to navigate · Esc to cancel
       expect(pane.sent).toEqual([]);
       expect((await card())!.id).not.toBe(first.id);
     });
+  });
+});
+
+describe("a pi dialog no reader knows", () => {
+  const rule = "─".repeat(40);
+  const footer = "no git      no-nvim\nctx ●   $0.000   0/182k ▱▱▱▱▱ 0%  arex-2 · med";
+  test("an extension's picker is found by its key hint, without pi's footer", () => {
+    const dialog = piDialogScreen(`Update Available\n\n Pick a session\n\n > Resume A\n   Resume B\n\n up/down move · enter select · esc cancel\n${rule}\n${footer}\n`)!;
+    expect(dialog).toContain("Pick a session");
+    expect(dialog).not.toContain("ctx");
+    expect(labels(parseFallbackPrompt("pi", dialog))).toEqual(["↑", "↓", "Enter", "Esc"]);
+  });
+  test("an editor's frame is its title and text between rules", () => {
+    const dialog = piDialogScreen(`old output\n${rule}\n Write the note\n${rule}\ndraft\n${rule}\n enter submit  shift+enter newline  escape/ctrl+c cancel\n${rule}\n${footer}\n`)!;
+    expect(dialog.split("\n").filter((line) => line.trim() && !line.startsWith("─"))).toEqual([" Write the note", "draft", " enter submit  shift+enter newline  escape/ctrl+c cancel"]);
+  });
+  test("pi working or idle, with no hint, is no dialog", () => {
+    expect(piDialogScreen(`${rule}\n hello\n ⠇ Working...\n${rule}\n${footer}\n`)).toBeNull();
+    expect(piDialogScreen(`${rule}\n❯ \n${rule}\n${footer}\n`)).toBeNull();
+  });
+  test("a hint quoted far above the footer is output, not a dialog", () => {
+    expect(piDialogScreen(` press enter then esc to cancel\n${"output\n".repeat(8)}${rule}\n${footer}\n`)).toBeNull();
   });
 });
