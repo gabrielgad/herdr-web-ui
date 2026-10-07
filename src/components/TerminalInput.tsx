@@ -6,6 +6,7 @@ import { readTerminalDraft, writeTerminalDraft, TERMINAL_LINE_LIMIT, subscribeTe
 
 import { useT } from "../lib/i18n.ts";
 import { useSettings } from "../lib/settings.ts";
+import { enterSends, touchScreen } from "../lib/enterKey.ts";
 import { MicButton, VoiceRecordingPill, useDictation } from "./VoiceInput.tsx";
 
 export interface TerminalInputProps {
@@ -91,8 +92,10 @@ export function TerminalInput({ owner, connected, onSend, onEnter, onComposing }
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
     // Enter sends; Shift+Enter breaks the line; an IME keeps its Enter, including the committing
-    // one WebKit can send after compositionend as key code 229
+    // one WebKit can send after compositionend as key code 229. On a touch screen the return key
+    // breaks the line too: only the send button, or Ctrl/Cmd+Enter, sends
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+    if (touchScreen() && !enterSends(event, true, true)) return;
     event.preventDefault();
     send();
   };
@@ -124,7 +127,7 @@ export function TerminalInput({ owner, connected, onSend, onEnter, onComposing }
         onCompositionEnd={() => { composing.current = false; onComposing?.(false); }}
         placeholder={t("Type for the terminal…")}
         aria-label={t("Terminal input line")}
-        enterKeyHint="send"
+        enterKeyHint={touchScreen() ? "enter" : "send"}
         autoCapitalize="off"
         onChange={(event) => { setText(event.target.value); setNote(null); }}
         onKeyDown={onKeyDown}

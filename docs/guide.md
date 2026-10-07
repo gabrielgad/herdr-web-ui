@@ -474,7 +474,7 @@ On a phone, use the header and More menu for app actions; Command palette is ava
 without a shortcut. The terminal key bar is configured separately under **Settings → Terminal**.
 An external keyboard uses the same app bindings as a desktop.
 
-Enter sends and Shift+Enter adds a line. Settings can switch sending to Mod+Enter.
+Enter sends and Shift+Enter adds a line. Settings can switch sending to Mod+Enter. On a touch screen the keyboard's return key always adds a line, in the chat box and the terminal input line; the send button sends, and Ctrl/Cmd+Enter from a hardware keyboard still does.
 
 ## How it works
 

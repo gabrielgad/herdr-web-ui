@@ -44,6 +44,7 @@ import { AgentMark } from "./AgentMark.tsx";
 import { BackgroundTasks } from "./BackgroundTasks.tsx";
 import { MicButton, VoiceRecordingPill, useDictation } from "./VoiceInput.tsx";
 import { useT } from "../lib/i18n.ts";
+import { enterSends, touchScreen } from "../lib/enterKey.ts";
 
 export interface ComposerProps {
   connected: boolean;
@@ -739,10 +740,7 @@ export function Composer({
         return;
       }
       if (event.key !== "Enter") return;
-      const shouldSend = settings.enterSends
-        ? !event.shiftKey && !event.metaKey && !event.ctrlKey
-        : (event.metaKey || event.ctrlKey) && !event.shiftKey;
-      if (!shouldSend) return;
+      if (!enterSends(event, settings.enterSends, touchScreen())) return;
       event.preventDefault();
       send();
     },
@@ -928,6 +926,7 @@ export function Composer({
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
+          enterKeyHint={touchScreen() ? "enter" : undefined}
           // stays editable while the socket reconnects (sending waits for it): a phone's
           // dictation keyboard opens its own app and comes back, the socket may drop meanwhile,
           // and a disabled box would lose its focus and the dictated text with it
