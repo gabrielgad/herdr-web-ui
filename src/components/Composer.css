@@ -263,6 +263,20 @@
   display: contents;
 }
 
+/* the model and the level open the agent's picker where it has one: the words themselves are the
+   target, so the pill keeps its look and only the pointer and the focus ring say they can be pressed */
+.composer-model[data-picker],
+.composer-reasoning[data-picker] {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.composer-model[data-picker]:focus-visible,
+.composer-reasoning[data-picker]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* a readable name in the UI face */
 .composer-model {
   flex: 0 1 auto;

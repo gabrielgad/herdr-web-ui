@@ -19,6 +19,7 @@ import type {
   RemoteAccess,
   RemoveWorktreeRequest,
   SessionSnapshot,
+  AgentModels,
   SlashCommand,
   TabCreated,
   UsageReport,
@@ -483,6 +484,11 @@ export async function closeWorkspace(workspaceId: string, machineId = "local", c
 export async function removeWorktree(request: RemoveWorktreeRequest, machineId = "local"): Promise<WorktreeRemoved> {
   const response = await sendJson(machinePath(machineId, "worktree/remove"), "POST", request);
   return (await response.json()) as WorktreeRemoved;
+}
+
+/** GET /api/pane/models: the models the pane's agent offers and the levels each takes; none for an agent with no reader. */
+export async function fetchPaneModels(paneId: string, machineId = "local"): Promise<AgentModels> {
+  return getJson<AgentModels>(machinePath(machineId, `pane/models?pane_id=${encodeURIComponent(paneId)}`));
 }
 
 /** GET /api/pane/commands: the slash commands the pane's agent understands (built-in + custom). */

@@ -11,6 +11,7 @@ import { DEVICE_COOKIE, authClient, handleAuthRequest, isAuthenticated, parseCoo
 import { cameThroughProxy, decideAccess, isLoopbackAddress, isServeOwnerRequest } from "./access.ts";
 import { DeviceStore, handleDeviceRequest } from "./devices.ts";
 import { remoteAccess, TailnetIdentitySource } from "./tailscale.ts";
+import { agentModels } from "./agent-models.ts";
 import { paneCommands } from "./commands.ts";
 import { paneFiles } from "./files.ts";
 import { badRequest, errorResponse, isCount, isJsonObject, jsonResponse } from "./http.ts";
@@ -1645,6 +1646,18 @@ export function createServer(
         try {
           await paneRename(payload.pane_id, payload.label.length === 0 ? null : payload.label);
           return jsonResponse({ ok: true });
+        } catch (error) {
+          return errorResponse(error);
+        }
+      }
+
+      if (pathname === "/api/pane/models") {
+        if (request.method !== "GET") return badRequest("method_not_allowed", "use GET");
+        const paneId = url.searchParams.get("pane_id");
+        if (!paneId) return badRequest("missing_pane_id", "pane_id query parameter is required");
+        try {
+          const context = await paneContext(paneId);
+          return jsonResponse(await agentModels(context.agent === "pi" && await paneRunsOmo(paneId) ? "omo" : context.agent));
         } catch (error) {
           return errorResponse(error);
         }

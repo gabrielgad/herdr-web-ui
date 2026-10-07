@@ -461,6 +461,8 @@ export const ZH: Record<string, string> = {
   "Sent as it was. Your changes made while it was sending stayed here and were not sent.": "已按原内容发送。发送期间所做的修改保留在此处，未被发送。",
   "Message composer": "消息输入框",
   "Model and reasoning": "模型和推理",
+  "Model": "模型",
+  "Reasoning": "推理",
   "Model not available": "模型信息不可用",
   "Model —": "模型 —",
   "Reasoning effort: {effort}": "推理强度：{effort}",
@@ -757,6 +759,8 @@ export const ZH: Record<string, string> = {
   "Queued message {n}": "排队的消息 {n}",
   "Not sent. Reconnect and try again.": "未发送。请重新连接后重试。",
   "Not confirmed. Check the terminal before sending again.": "未确认。重新发送前请检查终端。",
+  "The effort card changed. Check the terminal.": "力度卡片已变化。请检查终端。",
+  "The effort card did not open. Check the terminal.": "力度卡片未打开。请检查终端。",
   "Too large to attach: {name} ({size}). A file can be up to {limit}.": "文件过大，无法附加：{name}（{size}）。单个文件最大为 {limit}。",
   // ---- subscription usage ----
   "Beside Settings, how much of each plan the AI tools on the server's PC have used. Turning it on sends their sign-ins to each provider's usage endpoint; they are never refreshed here.": "在设置旁显示服务器电脑上的 AI 工具各计划的用量。开启后会将其登录信息发送到各提供商的用量端点，此处不会刷新令牌。",

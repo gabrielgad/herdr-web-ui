@@ -236,11 +236,52 @@ function finishDemoTurn(paneId: string, status: "idle" | "done" = "done"): void 
   }
 }
 
+const ALL_LEVELS = ["low", "medium", "high", "xhigh", "max"];
+const CLAUDE_MODELS = [
+  { id: "claude-fable-5-1", label: "Fable 5.1", efforts: ALL_LEVELS },
+  { id: "claude-opus-5-5", label: "Opus 5.5", efforts: ALL_LEVELS },
+  { id: "claude-sonnet-5-5", label: "Sonnet 5.5", efforts: ALL_LEVELS },
+  { id: "claude-sonnet-5", label: "Sonnet 5", efforts: ["low", "medium", "high", "max"] },
+  { id: "claude-haiku-4-5", label: "Haiku 4.5", efforts: [] },
+];
+const PI_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+const PI_MODELS = [
+  { id: "zai/glm-5.3", label: "glm-5.3", group: "zai", efforts: PI_LEVELS },
+  { id: "zai/glm-5.2", label: "glm-5.2", group: "zai", efforts: PI_LEVELS },
+  { id: "anthropic/claude-opus-5-5", label: "claude-opus-5-5", group: "anthropic", efforts: PI_LEVELS },
+  { id: "local/tiny", label: "tiny", group: "local", efforts: [] },
+];
+
+/** What the pane's agent offers for the composer's model and level menus; an agent the real server has no reader for offers none. */
+function agentModelsOf(agent: string): { source: string; models: unknown[]; set_model: string | null; set_effort: string | null; effort_card?: boolean } {
+  if (agent === "claude") return { source: "binary", models: CLAUDE_MODELS, set_model: "/model {value}", set_effort: "/effort", effort_card: true };
+  if (agent === "pi") return { source: "cli", models: PI_MODELS, set_model: "/model {value}", set_effort: "/thinking {value}" };
+  return { source: "none", models: [], set_model: null, set_effort: null };
+}
+
+/** The agent's own settings commands change what the pane runs and say nothing else, as the real ones do. */
+function applySettingCommand(chat: { metadata: { model: string; reasoning_effort: string } }, agent: string, text: string): boolean {
+  const match = /^\/(model|effort|thinking) (\S+)$/.exec(text.trim());
+  if (!match || (agent !== "claude" && agent !== "pi")) return false;
+  if (match[1] === "model") chat.metadata.model = agent === "pi" ? match[2]!.replace(/^[^/]+\//, "") : match[2]!;
+  else chat.metadata.reasoning_effort = match[2]!;
+  return true;
+}
+
+/** The pane whose bare `/effort` is open as a card; Claude Code's slider is answered, not typed to. */
+let effortCardPane: string | null = null;
+const EFFORT_CARD = {
+  id: "demo-effort", agent: "claude", kind: "question", title: "", question: "Set effort for this session", body: null,
+  options: ALL_LEVELS.map((label) => ({ label, description: null })), multi_select: false, custom_option_index: null,
+};
+
 /** A sent Enter joins the conversation now; another Enter steers the current mock turn. */
 function submitToChat(paneId: string, text: string): void {
   const key = keyOfPane.get(paneId);
   const chat = key ? chats.get(key) : undefined;
   if (!chat) return;
+  if (agentOf(paneId) === "claude" && text.trim() === "/effort") { effortCardPane = paneId; return; }
+  if (applySettingCommand(chat, agentOf(paneId), text)) return;
   chat.turns.push({ role: "user", ts: now(), parts: [{ kind: "text", text }] });
   const agent = agentOf(paneId);
   if (replying.has(paneId)) return;
@@ -414,14 +455,23 @@ async function route(url: URL, method: string, init: RequestInit | undefined, in
     const source = agent === "claude" ? "claude-transcript" : agent === "codex" ? "codex-transcript" : agent === "gjc" ? "gjc-transcript" : agent === "omo" ? "omo-transcript" : agent === "pi" ? "pi-transcript" : agent === "devin" ? "devin-transcript" : "omp-transcript";
     return json({ source, turns: chat.turns, metadata: chat.metadata, cursor: null });
   }
+  if (path === "/api/pane/prompt" && effortCardPane !== null && effortCardPane === paneId) return json({ prompt: EFFORT_CARD });
   if (path === "/api/pane/prompt") return json({ prompt: keyOfPane.get(paneId) === "web" && promptOpen ? { ...PROMPT, id: promptId } : null });
   if (path === "/api/pane/prompt/answer") {
     const body = await bodyOf(init, input);
     const target = String(body["pane_id"] ?? "");
+    if (effortCardPane !== null && target === effortCardPane && body["prompt_id"] === EFFORT_CARD.id) {
+      const level = ALL_LEVELS[Number(body["option_index"])];
+      const chat = chats.get(keyOfPane.get(target) ?? "");
+      if (chat && level) chat.metadata.reasoning_effort = level;
+      effortCardPane = null;
+      return json({ ok: true });
+    }
     if (keyOfPane.get(target) !== "web" || !promptOpen || body["prompt_id"] !== promptId) return error("prompt_changed", "the screen no longer shows that prompt", 409);
     answerPrompt(target, typeof body["option_index"] === "number" ? body["option_index"] : undefined);
     return json({ ok: true });
   }
+  if (path === "/api/pane/models") return json(agentModelsOf(agentOf(paneId)));
   if (path === "/api/pane/commands") return json(commandsFixture);
   if (path === "/api/pane/omo-tasks") return json(keyOfPane.get(paneId) === OMO_TASKS_PANE ? { tasks: omoTasks(), runs: omoRuns() } : { tasks: [], runs: [] });
   if (path === "/api/pane/files") {

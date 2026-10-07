@@ -83,6 +83,9 @@ export type { Machine, MachineEvent, PaneTarget, SetupJob, SetupRequest, SetupAc
  *         server's environment sets it), path for the prompt
  *  GET    /api/pane/commands?pane_id=   -> { commands: SlashCommand[] } (the agent's slash
  *         commands: built-ins per agent kind + the user's and the project's custom commands)
+ *  GET    /api/pane/models?pane_id=     -> AgentModels (the models the pane's agent offers and the
+ *         effort levels each takes, read from the agent installed on that PC; `models` is empty
+ *         for an agent with no reader, and the composer's pill then stays as it is)
  *  GET    /api/pane/omo-tasks?pane_id=  -> OmoActivity (the background tasks and workflows the
  *         pane's OmO session started: running ones, then those that ended in the last day; empty
  *         for a pane that is not OmO or whose session is not known yet. server_time: that PC's
@@ -524,6 +527,34 @@ export interface WorkspaceCreated {
  * launch leaves the tab there, reachable through pane_id, as workspace creation does.
  */
 export type TabCreated = WorkspaceCreated;
+
+/** GET /api/pane/models: one model an agent offers. */
+export interface AgentModel {
+  /** what the agent's own command takes: `claude-opus-5-5`, `provider/model` */
+  id: string;
+  label: string;
+  /** a heading to list the model under (pi's provider) */
+  group?: string;
+  /** the levels this model takes, lowest first; empty when it has none */
+  efforts: string[];
+}
+
+/**
+ * GET /api/pane/models. `set_model` and `set_effort` are the agent's own commands with the pick
+ * written `{value}`; the client sends them as a message, so a pick follows the same delivery
+ * policy as typing it. Null: the agent has no command for it.
+ */
+export interface AgentModels {
+  source: "binary" | "cli" | "fallback" | "none";
+  models: AgentModel[];
+  set_model: string | null;
+  set_effort: string | null;
+  /**
+   * `set_effort` opens a card (Claude Code's `/effort` slider) instead of taking the level: send it,
+   * then answer the card with the level, which keeps the pick to this session. Absent: false.
+   */
+  effort_card?: boolean;
+}
 
 /** GET /api/pane/commands: one slash command the pane's agent understands. */
 export interface SlashCommand {

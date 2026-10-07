@@ -663,6 +663,13 @@ describe("workspace and discovery endpoints", () => {
     expect(commands.status).toBe(200);
     expect(await commands.json()).toEqual({ commands: [] });
 
+    // a shell has no agent to read a catalog from: no models, and no commands to set one
+    const models = await fetch(`${base()}/api/pane/models?pane_id=${encodeURIComponent(paneId)}`);
+    expect(models.status).toBe(200);
+    expect(await models.json()).toEqual({ source: "none", models: [], set_model: null, set_effort: null });
+    expect((await fetch(`${base()}/api/pane/models`)).status).toBe(400);
+    expect((await fetch(`${base()}/api/pane/models?pane_id=${encodeURIComponent(paneId)}`, { method: "POST" })).status).toBe(400);
+
     const files = await fetch(`${base()}/api/pane/files?pane_id=${encodeURIComponent(paneId)}&q=${encodeURIComponent(fileName)}&limit=5`);
     expect(files.status).toBe(200);
     expect(((await files.json()) as { files: string[] }).files).toContain(fileName);

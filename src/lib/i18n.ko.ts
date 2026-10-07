@@ -457,6 +457,8 @@ export const KO: Record<string, string> = {
   "Sent as it was. Your changes made while it was sending stayed here and were not sent.": "원래 내용대로 보냈습니다. 보내는 동안 고친 부분은 여기 남아 있고 전송되지 않았습니다.",
   "Message composer": "메시지 입력창",
   "Model and reasoning": "모델과 추론",
+  "Model": "모델",
+  "Reasoning": "추론",
   "Model not available": "모델 정보 없음",
   "Model —": "모델 —",
   "Reasoning effort: {effort}": "추론 강도: {effort}",
@@ -753,6 +755,8 @@ export const KO: Record<string, string> = {
   "Queued message {n}": "대기 메시지 {n}",
   "Not sent. Reconnect and try again.": "전송하지 못했습니다. 다시 연결한 후 시도하세요.",
   "Not confirmed. Check the terminal before sending again.": "전송 여부를 확인하지 못했습니다. 다시 보내기 전에 터미널을 확인하세요.",
+  "The effort card changed. Check the terminal.": "노력 수준 카드가 바뀌었습니다. 터미널을 확인하세요.",
+  "The effort card did not open. Check the terminal.": "노력 수준 카드가 열리지 않았습니다. 터미널을 확인하세요.",
   "Too large to attach: {name} ({size}). A file can be up to {limit}.": "첨부하기에는 너무 큽니다: {name} ({size}). 파일은 {limit}까지 첨부할 수 있습니다.",
   // ---- subscription usage ----
   "Beside Settings, how much of each plan the AI tools on the server's PC have used. Turning it on sends their sign-ins to each provider's usage endpoint; they are never refreshed here.": "설정 옆에 서버 PC의 AI 도구가 요금제를 얼마나 썼는지 표시합니다. 켜면 각 도구의 로그인 정보를 provider의 사용량 엔드포인트로 보내며, 여기서 토큰을 갱신하지는 않습니다.",

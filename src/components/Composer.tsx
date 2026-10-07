@@ -9,10 +9,11 @@ import {
   type ClipboardEvent,
   type DragEvent,
   type KeyboardEvent,
+  type MouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { ArrowUp, FileText, Plus, Square, X } from "lucide-react";
+import { ArrowUp, Brain, Cpu, FileText, Plus, Square, X } from "lucide-react";
 
 import "./Composer.css";
 
@@ -36,6 +37,9 @@ import {
   terminalOnlyCommand,
 } from "../lib/compose.ts";
 import { modelLabel } from "../lib/modelName.ts";
+import { hasPillPicker } from "../../shared/pill.ts";
+import { effortCardIndex, pickCommand, pillChoices, type PillPart } from "../lib/pillMenu.ts";
+import { RowMenu, type RowMenuItem } from "./RowMenu.tsx";
 import { useFacesArrived } from "../lib/fontFaces.ts";
 import { activeTrigger, applyCompletion, type ActiveTrigger } from "../lib/mentions.ts";
 import { quickReplyButtons, useSettings } from "../lib/settings.ts";
@@ -221,7 +225,7 @@ export function Composer({
 }: ComposerProps) {
   const t = useT();
   const machineId = useMachineId();
-  const { fetchPaneCommands, fetchPaneFiles } = useMachineApi();
+  const { answerPanePrompt, fetchPaneCommands, fetchPaneFiles, fetchPaneModels, fetchPanePrompt } = useMachineApi();
   const { settings } = useSettings();
   const mobile = useMediaQuery("(max-width: 640px), (pointer: coarse)");
   const usageEnabled = settings.showUsage && !mobile && machineId === "local" && providerForAgent(agent) !== null;
@@ -681,12 +685,14 @@ export function Composer({
     }
   }, [attachments, connected, dictation.forget, draftKey, onSend, sending, text, uploading]);
 
-  /** A quick reply follows the same delivery policy as Send, and leaves the box alone. */
-  const sendQuick = useCallback((reply: string) => {
+  /** A quick reply follows the same delivery policy as Send, and leaves the box alone. `after` runs once it was delivered. */
+  const sendQuick = useCallback((reply: string, after?: () => void) => {
     if (!connected || sending) return;
     setNote(null);
     const settle = (result: boolean | string): void => {
-      if (mounted.current && typeof result === "string") setNote(result);
+      if (!mounted.current) return;
+      if (typeof result === "string") setNote(result);
+      else if (result) after?.();
     };
     if (!composerDrafts.begin(draftKey)) return;
     try {
@@ -777,6 +783,70 @@ export function Composer({
   const hint = composerStatusHint({ uploading, connected, text });
   const model = metadata?.model ? modelLabel(metadata.model) : null;
   const modelShown = Boolean(metadata?.model || metadata?.reasoning_effort);
+  /**
+   * A level for this session only: the bare command opens the agent's own card, and answering the
+   * card, never a level typed after the command, leaves the default for new sessions alone.
+   */
+  const answerEffortCard = useCallback(async (level: string): Promise<void> => {
+    const tapped = paneId;
+    for (let attempt = 0; attempt < 24 && mounted.current && tapped === paneId; attempt++) {
+      const prompt = await fetchPanePrompt(tapped).catch(() => null);
+      const index = effortCardIndex(prompt, level);
+      if (prompt && index !== null) {
+        try {
+          await answerPanePrompt({ pane_id: tapped, prompt_id: prompt.id, option_index: index });
+        } catch {
+          if (mounted.current) setNote(t("The effort card changed. Check the terminal."));
+        }
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    if (mounted.current && tapped === paneId) setNote(t("The effort card did not open. Check the terminal."));
+  }, [answerPanePrompt, fetchPanePrompt, paneId]);
+  /**
+   * A tap on the model or the level lists what the agent offers (the catalog the server read off
+   * it) and a pick sends the agent's own command, as typing it would. Any other agent keeps a
+   * pill that only shows.
+   * Not while it works or waits on an answer.
+   */
+  const pickerIdle = connected && !sending && !isWorking && answerHint === null;
+  const [pillMenu, setPillMenu] = useState<{ anchor: HTMLElement; part: PillPart; title: string; items: RowMenuItem[] } | null>(null);
+  const openPill = (part: PillPart, anchor: HTMLElement): void => {
+    const tapped = paneId;
+    void (agent ? fetchPaneModels(paneId).catch(() => null) : Promise.resolve(null)).then((catalog) => {
+      if (!mounted.current || tapped !== paneId) return;
+      const choices = pillChoices(catalog, part, metadata?.model, metadata?.reasoning_effort);
+      const template = part === "model" ? catalog?.set_model : catalog?.set_effort;
+      if (!choices || !template) return;
+      setPillMenu({
+        anchor, part, title: part === "model" ? t("Model") : t("Reasoning"),
+        items: choices.map((choice, index) => ({
+          id: choice.value, label: choice.label, icon: part === "model" ? Cpu : Brain, current: choice.current,
+          ...(choice.group && choice.group !== choices[index - 1]?.group ? { divider: index > 0 } : {}),
+          ...(choice.group ? { hint: choice.group } : {}),
+          run: () => part === "effort" && catalog?.effort_card
+            ? sendQuick(template, () => { void answerEffortCard(choice.value); })
+            : sendQuick(pickCommand(template, choice.value)),
+        })),
+      });
+    });
+  };
+  const pickerProps = (part: PillPart) => {
+    if (!agent || !pickerIdle || !hasPillPicker(agent)) return {};
+    return {
+      role: "button" as const,
+      tabIndex: 0,
+      "aria-haspopup": "menu" as const,
+      "data-picker": "",
+      onClick: (event: MouseEvent<HTMLElement>) => openPill(part, event.currentTarget),
+      onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        openPill(part, event.currentTarget);
+      },
+    };
+  };
   const usageDetail = usageWindows.map((window) => {
     const reset = formatResetIn(window.resets_at, Date.now());
     return `${windowLabel(window)} ${meterText(window, settings.usageCount)}${reset ? ` · ${t("Resets in {time}", { time: reset })}` : ""}`;
@@ -982,18 +1052,18 @@ export function Composer({
             <span className="composer-agent-label visually-hidden">{agentLabel}</span>
             <span className="composer-status-separator visually-hidden" aria-hidden="true">·</span>
             <strong className="visually-hidden">{t(composerStatusWord(agentStatus))}</strong>
-            {/* the mark, the model, the level and the context ring as one quiet pill. It only shows: no role,
-                no focus, nothing to press but the ring inside it. A pane that names no model draws no pill
+            {/* the mark, the model, the level and the context ring as one quiet pill. It only shows: the
+                model and the level open a menu of what the agent offers (Claude, pi), and the ring inside it toggles. A pane that names no model draws no pill
                 (.is-bare): the mark, a level if it has one, and the ring stand in the row as they are */}
             <span className={`composer-pill${metadata?.model ? "" : " is-bare"}`}>
               {agent && <AgentMark agent={agent} size={14} />}
               {modelShown && <span className="composer-model-info" aria-label={t("Model and reasoning")}>
                 {/* a name only for an id modelLabel can name for certain; any other id is drawn as received, in the identifier face */}
-                <span className={`composer-model${model ? model.named ? "" : " is-id" : " is-none"}`} title={metadata?.model ?? t("Model not available")}>{model?.text ?? t("Model —")}</span>
+                <span className={`composer-model${model ? model.named ? "" : " is-id" : " is-none"}`} title={metadata?.model ?? t("Model not available")} {...pickerProps("model")}>{model?.text ?? t("Model —")}</span>
                 {/* behind a name the id as received is still read; a touch cannot reach the title */}
                 {model?.named && <span className="composer-model-id visually-hidden">{metadata?.model}</span>}
                 {/* no level recorded: nothing is drawn for it, no dot and no dash; the sentence is still read */}
-                <span className={`composer-reasoning${metadata?.reasoning_effort ? "" : " visually-hidden"}`} title={metadata?.reasoning_effort ? t("Reasoning effort: {effort}", { effort: metadata.reasoning_effort }) : t("Reasoning effort not available")}>
+                <span className={`composer-reasoning${metadata?.reasoning_effort ? "" : " visually-hidden"}`} title={metadata?.reasoning_effort ? t("Reasoning effort: {effort}", { effort: metadata.reasoning_effort }) : t("Reasoning effort not available")} {...pickerProps("effort")}>
                   <span className="composer-reasoning-full visually-hidden">{t("Reasoning {effort}", { effort: metadata?.reasoning_effort ?? "—" })}</span>
                   {metadata?.reasoning_effort && <>
                     <span className="composer-reasoning-dot" aria-hidden="true">·</span>
@@ -1001,6 +1071,7 @@ export function Composer({
                   </>}
                 </span>
               </span>}
+              {pillMenu && <RowMenu anchor={pillMenu.anchor} title={pillMenu.title} items={pillMenu.items} align="start" onClose={() => setPillMenu(null)} />}
               {metadata?.context && <ContextRing context={metadata.context} shown={contextShown} readOnly={mobile} onToggle={() => setContextShown((open) => !open)} />}
               {usage !== undefined && usage.problem === null && usageLimit !== undefined && <span
                 className={`composer-usage${usageLimit.used_percent >= HIGH_PERCENT ? " is-high" : ""}${usage.problem ? " has-problem" : ""}`}

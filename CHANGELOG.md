@@ -26,6 +26,7 @@ between releases do not reach them. Remote-PC runtime bundles are versioned sepa
   `HERDR_WEB_TELEMETRY=0` or `DO_NOT_TRACK=1` turns it off on the server.
   ([Anonymous usage counts](docs/guide.md#anonymous-usage-counts),
   [#599](https://github.com/devswha/herdr-web-ui/pull/599))
+- Model and level in the composer pill open a menu for Claude Code, pi and agy. Claude's level is set for this session only.
 
 ### Changed
 - The default mobile terminal key bar puts Esc, Tab and Ctrl+C first, before the held modifiers

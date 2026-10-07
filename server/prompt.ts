@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
+import { EFFORT_CARD_QUESTION } from "../shared/pill.ts";
 import type { HerdrPane, InteractivePrompt, PromptAnswer } from "../shared/protocol.ts";
 import { codexTranscriptPath, paneCodexHome, unansweredCodexQuestions, type QueuedQuestion } from "./codex.ts";
 import { HerdrError, paneRead, paneSendKeys, paneSendText, sessionSnapshot } from "./herdr/client.ts";
@@ -1749,7 +1750,7 @@ function parseClaudeEffort(screen: string): ParsedPrompt | null {
     // where the slider stands is no part of what the card asks: one card wherever ▲ is
     kind: "question",
     title: "",
-    question: "Set effort for this session",
+    question: EFFORT_CARD_QUESTION,
     body: null,
     options: names.map((label) => ({ label, description: null })),
     multi_select: false,

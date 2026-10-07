@@ -169,13 +169,15 @@ export function RowMenu({ anchor, title, subtitle, header, items, align = "end",
               {subtitle && <span className="row-sheet-subtitle">{subtitle}</span>}
             </div>
           )}
-          {items.map((item) => (
-            <button key={item.id} type="button" className={`row-sheet-item${item.danger ? " is-danger" : ""}${item.divider ? " has-divider" : ""}`} aria-current={item.current ? "true" : undefined} aria-pressed={item.checked} title={item.title} onMouseDown={keepFocus} onClick={() => run(item)}>
-              {item.glyph ?? <item.icon aria-hidden="true" />}
-              <span className="row-sheet-label">{item.label}</span>
-              {item.hint && <span className="row-sheet-hint">{item.hint}</span>}
-            </button>
-          ))}
+          <div className="row-sheet-list">
+            {items.map((item) => (
+              <button key={item.id} type="button" className={`row-sheet-item${item.danger ? " is-danger" : ""}${item.divider ? " has-divider" : ""}`} aria-current={item.current ? "true" : undefined} aria-pressed={item.checked} title={item.title} onMouseDown={keepFocus} onClick={() => run(item)}>
+                {item.glyph ?? <item.icon aria-hidden="true" />}
+                <span className="row-sheet-label">{item.label}</span>
+                {item.hint && <span className="row-sheet-hint">{item.hint}</span>}
+              </button>
+            ))}
+          </div>
           <button type="button" className="btn row-sheet-cancel" onMouseDown={keepFocus} onClick={onClose}>{t("Cancel")}</button>
         </div>
       </div>,
