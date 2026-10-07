@@ -1292,10 +1292,19 @@ export function PaneTerminal({
       /* not laid out yet; the ResizeObserver will follow up */
     }
     socket.attach(paneId, term.cols, term.rows, chatViewRef.current);
+    // looking at it, not just attached: a window in the background or a tab left open sees nothing
+    const looking = (): void => socket.viewing(paneId, document.visibilityState === "visible" && document.hasFocus());
+    looking();
+    document.addEventListener("visibilitychange", looking);
+    window.addEventListener("focus", looking);
+    window.addEventListener("blur", looking);
     // the chat lens covers the grid and its composer takes the keyboard: focusing the hidden
     // grid sent the keys straight to the pane, and showed a phone's IME text mid-screen
     if (!chatViewRef.current && !autoSelected && !coarseRef.current) term.focus();
     return () => {
+      document.removeEventListener("visibilitychange", looking);
+      window.removeEventListener("focus", looking);
+      window.removeEventListener("blur", looking);
       socket.detach(paneId);
       if (pendingScopeRef.current !== null) pendingMessages.suspend(paneStorageId(machineId, paneId), pendingScopeRef.current);
     };

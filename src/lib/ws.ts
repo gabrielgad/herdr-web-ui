@@ -224,6 +224,11 @@ export class HerdrSocket {
     };
   }
 
+  /** Tell the server whether the person is looking at this pane (window visible and focused). */
+  viewing(paneId: string, viewing: boolean): void {
+    this.send({ type: "viewing", pane_id: paneId, viewing });
+  }
+
   detach(paneId: string): void {
     this.outputSeen.delete(paneId);
     this.inputReady.delete(paneId);

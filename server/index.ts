@@ -23,6 +23,7 @@ import { omoPanes } from "./omo.ts";
 import { OMO_ALIASES, OmoStatus, processAlive } from "./omo-status.ts";
 import { omoRuns, omoTasks } from "./omo-tasks.ts";
 import { CompletionTracker } from "./completion.ts";
+import { withViewedPanes } from "./viewed-panes.ts";
 import { freeAgentName } from "./agent-name.ts";
 import { SHELL_AGENTS, isShellAgentKind, shellAgentExecutable, startShellAgent } from "./shell-agent.ts";
 import { listDirectories } from "./directories.ts";
@@ -256,6 +257,8 @@ interface SocketData {
   relay?: MachineRelay;
   /** A fresh claim per attach lifetime; deleting it invalidates queued terminal keys. */
   attached: Map<string, object>;
+  /** the attached pane the person is looking at now (window visible and focused), if any */
+  viewing?: string | null;
   output: Map<string, OutputWindow>;
   closing: boolean;
   /** the connection's authority: observe connections cannot type or resize */
@@ -368,6 +371,8 @@ export function createServer(
   } = {},
 ): { port: number; hostname: string; stop: () => void } {
   const attachments = new Map<string, PaneAttachment>();
+  /** panes herdr itself reported as done, until they work again: its done is not the tracker's to clear */
+  const herdrDone = new Set<string>();
   /** whether this bridge can `terminal attach`: herdr is asked once, and the PTY sidecar has to be runnable here (server/pty/sidecar.ts) */
   /** whether the sidecar can run, settled as the server starts so that attach, /api/health and /api/bridge tell one answer; a forced answer (tests) stands in for it */
   const sidecar = options.sidecar ?? (options.terminalAttach === undefined ? sidecarAvailable() : options.terminalAttach !== false);
@@ -706,9 +711,14 @@ export function createServer(
     await omo.refresh(snapshot.panes);
     return omo.apply(snapshot);
   };
+  // herdr clears its own `done` only when its terminal focuses the pane. A pane open in a browser is
+  // seen: it reads idle from the moment it was opened until it works or blocks again
+  const openedDone = new Set<string>();
+  const watched = (paneId: string): boolean => [...(attachments.get(paneId)?.clients ?? [])].some((client) => client.data.viewing === paneId);
+  const viewed = (paneId: string): boolean => openedDone.has(paneId) || watched(paneId);
   /** the snapshot clients get: finishes settled, OmO panes named, their running background tasks counted */
   const clientSnapshot = async (): Promise<SessionSnapshot> => {
-    const snapshot = await completions.readSnapshot(rawSnapshot);
+    const snapshot = withViewedPanes(await completions.readSnapshot(rawSnapshot), viewed);
     if (!snapshot.panes.some((pane) => omo.backgroundOf(pane.pane_id) > 0)) return snapshot;
     return { ...snapshot, panes: snapshot.panes.map((pane) => omo.backgroundOf(pane.pane_id) > 0 ? { ...pane, background_tasks: omo.backgroundOf(pane.pane_id) } : pane) };
   };
@@ -1144,6 +1154,16 @@ export function createServer(
     if (turn) push.onStatus(paneId, status).catch(logPushError);
   }
 
+  /** A finish reported as done, now in front (at herdr's terminal or open in a browser): seen, idle again. */
+  function markSeen(paneId: string): void {
+    // the mark holds herdr's own done at idle until the pane works again (cleared in onStatus)
+    openedDone.add(paneId);
+    if (!completions.seen(paneId) && !herdrDone.has(paneId)) return;
+    pending.status(paneId, "idle"); drainPending(paneId);
+    broadcastAll({ type: "pane-status", pane_id: paneId, agent_status: "idle" });
+    push.onStatus(paneId, "idle").catch(logPushError);
+  }
+
   const collector = startStatusCollector({
     onStatus: (paneId, raw, agent, replay) => {
       // read back from a snapshot around a gap between subscriptions. An OmO pane's status there
@@ -1163,18 +1183,16 @@ export function createServer(
       if (raw === "working") promptWaitEnded(paneId);
       // an agent herdr lost on the way still works and finishes as such (server/completion.ts);
       // an OmO pane whose session is not known keeps herdr's status, under its own name
-      const status = completions.observe(paneId, raw, omo.runs(paneId) ? "omo" : agent);
+      let status = completions.observe(paneId, raw, omo.runs(paneId) ? "omo" : agent);
+      if (status === "done") herdrDone.add(paneId); else { herdrDone.delete(paneId); openedDone.delete(paneId); }
+      // finished with a browser looking at the pane: seen at once, so it never shows done
+      if (status === "done" && watched(paneId)) { completions.seen(paneId); openedDone.add(paneId); status = "idle"; }
       pending.status(paneId, status); drainPending(paneId);
       broadcastAll({ type: "pane-status", pane_id: paneId, agent_status: status });
       push.onStatus(paneId, status).catch(logPushError);
     },
     // a finish reported as done, now in front at herdr's terminal: seen, idle again
-    onFocus: (paneId) => {
-      if (!completions.seen(paneId)) return;
-      pending.status(paneId, "idle"); drainPending(paneId);
-      broadcastAll({ type: "pane-status", pane_id: paneId, agent_status: "idle" });
-      push.onStatus(paneId, "idle").catch(logPushError);
-    },
+    onFocus: (paneId) => markSeen(paneId),
     onBaseline: (panes) => {
       push.seed(panes);
       for (const pane of panes) {
@@ -2013,8 +2031,17 @@ export function createServer(
               if (attachment?.clients.has(client)) attachment.takeOver?.(client);
               break;
             }
+            case "viewing": {
+              if (typeof message.pane_id !== "string" || !client.data.attached.has(message.pane_id)) break;
+              if (message.viewing === true) {
+                client.data.viewing = message.pane_id;
+                markSeen(message.pane_id);
+              } else if (client.data.viewing === message.pane_id) client.data.viewing = null;
+              break;
+            }
             case "detach": {
               client.data.attached.delete(message.pane_id);
+              if (client.data.viewing === message.pane_id) client.data.viewing = null;
               detach(message.pane_id, client);
               break;
             }

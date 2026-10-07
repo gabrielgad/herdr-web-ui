@@ -641,6 +641,8 @@ export type ClientMessage =
   /** keep_size: the grid is covered (the chat lens), so the attach leaves the shared pty's size as it is */
   | { type: "attach"; pane_id: string; cols: number; rows: number; flow_control?: "ack"; keep_size?: boolean }
   | { type: "detach"; pane_id: string }
+  /** the person is looking at this attached pane now (window visible and focused); false when not */
+  | { type: "viewing"; pane_id: string; viewing: boolean }
   /** a pane another web bridge holds (`attach_held`): take herdr's attach slot from it, here, now */
   | { type: "take-over"; pane_id: string }
   | { type: "input"; pane_id: string; text: string }

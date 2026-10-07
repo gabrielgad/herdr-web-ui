@@ -834,7 +834,7 @@ class DemoSocket extends EventTarget {
           }
         }
         break;
-      default: /* resize, pty-ack: nothing to do in the demo */
+      default: /* resize, pty-ack, viewing: nothing to do in the demo */
     }
   }
 

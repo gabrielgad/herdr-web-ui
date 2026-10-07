@@ -1800,6 +1800,84 @@ describe("web push", () => {
     }
   }, 40_000);
 
+  it("reads a finished pane as ready once a browser looks at it, not merely has it attached", async () => {
+    // herdr clears `done` only when its own terminal focuses the pane; a browser never does.
+    let created: Awaited<ReturnType<typeof workspaceCreate>> | undefined;
+    let dir: string | undefined;
+    let bridge: ReturnType<typeof createServer> | undefined;
+    let watcher: RecordingSocket | undefined;
+    let other: RecordingSocket | undefined;
+    try {
+      created = await workspaceCreate({ cwd: tmpdir(), label: "herdr-web-ui-test-opened-done" });
+      const paneId = created.root_pane.pane_id;
+      dir = mkdtempSync(join(tmpdir(), "herdr-web-ui-opened-done-"));
+      bridge = createServer({ port: 0, hostname: "127.0.0.1", token: "", stateDir: dir, machines: false });
+      watcher = await RecordingSocket.connect(`ws://127.0.0.1:${bridge.port}/ws`);
+      other = await RecordingSocket.connect(`ws://127.0.0.1:${bridge.port}/ws`);
+      const shownStatus = async () => ((await (await fetch(`http://127.0.0.1:${bridge!.port}/api/session`)).json()) as { snapshot: SessionSnapshot })
+        .snapshot.panes.find((pane) => pane.pane_id === paneId)?.agent_status;
+      const pushed = (socket: RecordingSocket, status: string) => socket.seen.some((message) => message.type === "pane-status" && message.pane_id === paneId && message.agent_status === status);
+      const report = async (state: string, expected: string) => {
+        watcher!.seen.length = 0;
+        await herdrRpc("pane.report_agent", { pane_id: paneId, source: "manual", agent: "claude", state });
+        await watcher!.waitFor((message) => message.type === "pane-status" && message.pane_id === paneId && message.agent_status === expected,
+          `claude/${state} presented as ${expected}`, 5_000);
+      };
+      const settle = () => new Promise((resolve) => setTimeout(resolve, 400));
+
+      // finished with nobody looking: done
+      await report("working", "working");
+      await report("idle", "done");
+      expect(await shownStatus()).toBe("done");
+
+      // attached alone is not looking: still done
+      watcher.send({ type: "attach", pane_id: paneId, cols: 100, rows: 30 });
+      other.send({ type: "attach", pane_id: paneId, cols: 100, rows: 30 });
+      await settle();
+      expect(pushed(watcher, "idle")).toBe(false);
+      expect(await shownStatus()).toBe("done");
+
+      // a client that is not looking changes nothing
+      other.send({ type: "viewing", pane_id: paneId, viewing: false });
+      await settle();
+      expect(await shownStatus()).toBe("done");
+
+      // looking: ready, to every client and to the next snapshot
+      watcher.seen.length = 0;
+      watcher.send({ type: "viewing", pane_id: paneId, viewing: true });
+      await watcher.waitFor((message) => message.type === "pane-status" && message.pane_id === paneId && message.agent_status === "idle",
+        "idle once viewed", 5_000);
+      expect(await shownStatus()).toBe("idle");
+
+      // finishing while looked at: straight to ready, never done
+      await report("working", "working");
+      watcher.seen.length = 0;
+      await herdrRpc("pane.report_agent", { pane_id: paneId, source: "manual", agent: "claude", state: "idle" });
+      await watcher.waitFor((message) => message.type === "pane-status" && message.pane_id === paneId && message.agent_status === "idle",
+        "idle on finishing while viewed", 5_000);
+      expect(pushed(watcher, "done")).toBe(false);
+      expect(await shownStatus()).toBe("idle");
+
+      // finishing while attached but not looking (the viewer hid the window): done
+      watcher.send({ type: "viewing", pane_id: paneId, viewing: false });
+      await report("working", "working");
+      await report("idle", "done");
+      expect(await shownStatus()).toBe("done");
+
+      // a pane it never attached cannot be marked seen
+      other.send({ type: "detach", pane_id: paneId });
+      other.send({ type: "viewing", pane_id: paneId, viewing: true });
+      await settle();
+      expect(await shownStatus()).toBe("done");
+    } finally {
+      watcher?.close();
+      other?.close();
+      bridge?.stop();
+      if (dir) rmSync(dir, { recursive: true, force: true });
+      if (created) await workspaceClose(created.workspace.workspace_id).catch(() => undefined);
+    }
+  }, 40_000);
+
   it("alerts on the very first change after a restart, measured against herdr's snapshot", async () => {
     // A server restart must not cost the first alert: the collector seeds each pane's
     // status from its startup snapshot. Pane `watched` is already working when the new

@@ -340,6 +340,20 @@ it("requires attachment readiness and never replays held input after a detach", 
   client.close();
 });
 
+it("tells the server whether the pane is being looked at", () => {
+  const client = new HerdrSocket("ws://test/ws");
+  client.connect();
+  const socket = FakeSocket.last;
+  socket.open();
+  client.viewing("w1:p1", true);
+  client.viewing("w1:p1", false);
+  expect(socket.sent.filter((m) => m.type === "viewing")).toEqual([
+    { type: "viewing", pane_id: "w1:p1", viewing: true },
+    { type: "viewing", pane_id: "w1:p1", viewing: false },
+  ]);
+  client.close();
+});
+
 it("takes a held pane only from a server that knows how, while interacting with an attached pane", () => {
   const takes = (socket: FakeSocket) => socket.sent.filter((m) => m.type === "take-over");
   const old = new HerdrSocket("ws://test/ws");
