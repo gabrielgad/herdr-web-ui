@@ -262,8 +262,13 @@ function finishPrompt(
   /** fields as the id reads them, where that is not as the card shows them (a fallback card's ticking working line) */
   hashed: Partial<Pick<InteractivePrompt, "question" | "body">> & { call?: string } = {},
 ): ParsedPrompt {
+  // Claude's unattended-session warning counts down ("will automatically deny this request in 1:34"):
+  // its time is no part of the prompt, or every tap on the card would be answered as stale
+  const ticking = (text: string | null | undefined): string | null | undefined =>
+    text?.replace(/(automatically deny this request in )\d+:\d{2}/gi, "$1…");
+  const shown = { ...input, ...hashed };
   const id = createHash("sha256")
-    .update(JSON.stringify({ agent, ...input, ...hashed }))
+    .update(JSON.stringify({ agent, ...shown, question: ticking(shown.question) ?? shown.question, body: ticking(shown.body) ?? shown.body }))
     .digest("hex")
     .slice(0, 12);
   // Hash all approval details before applying the display cap. Cursor movement

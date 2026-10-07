@@ -4057,3 +4057,32 @@ Enter to select · ↑/↓ to navigate · Esc to cancel
     });
   });
 });
+
+describe("a Claude approval with the unattended-session countdown", () => {
+  const screen = (time: string) => [
+    "● Bash(rm -rf /tmp/x)",
+    "─".repeat(60),
+    "Bash command",
+    "",
+    "  rm -rf /tmp/x",
+    "",
+    "This shell -c script runs rm and could not be checked",
+    `⚠ Claude Code will automatically deny this request in ${time}, to avoid blocking progress on an unattended`,
+    "session",
+    "",
+    "Do you want to proceed?",
+    "❯ 1. Yes",
+    "  2. No",
+    "",
+    "Esc to cancel · Tab to amend",
+  ].join("\n");
+  test("keeps its id while the countdown ticks", () => {
+    const first = parseInteractivePrompt("claude", screen("1:34"));
+    expect(first).not.toBeNull();
+    expect(parseInteractivePrompt("claude", screen("1:19"))?.id).toBe(first!.id);
+  });
+  test("still tells another command apart", () => {
+    const other = screen("1:34").replaceAll("rm -rf /tmp/x", "rm -rf /tmp/y");
+    expect(parseInteractivePrompt("claude", other)?.id).not.toBe(parseInteractivePrompt("claude", screen("1:34"))?.id);
+  });
+});
