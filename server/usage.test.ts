@@ -189,6 +189,22 @@ describe("providers", () => {
     ]);
   });
 
+  it("ignores a ~/.claude-* directory nothing is signed in to", async () => {
+    const credentials = (token: string) => JSON.stringify({ claudeAiOauth: { accessToken: token, expiresAt: NOW + HOUR } });
+    const service = (dir: string) => `Claude Code-credentials-${createHash("sha256").update(dir).digest("hex").slice(0, 8)}|me`;
+    const work = join(home, ".claude-work");
+    const cache = join(home, ".claude-cache");
+    keychain.set("Claude Code-credentials|me", { status: "found", value: credentials("personal") });
+    keychain.set(service(work), { status: "found", value: credentials("work") });
+    keychain.set(service(cache), { status: "locked" });
+    write(join(work, ".claude.json"), { oauthAccount: { accountUuid: "uuid-2", emailAddress: "work@example.com" } });
+    mkdirSync(cache);
+    replies.set("https://api.anthropic.com/api/oauth/usage", { body: { five_hour: { utilization: 1, resets_at: null } } });
+    const report = await new UsageService(context("darwin"), only("claude")).report();
+    expect(report.providers).toHaveLength(2);
+    expect(requests.map((request) => (request.init.headers as Record<string, string>)["authorization"])).toEqual(["Bearer personal", "Bearer work"]);
+  });
+
   it("finds a second Claude account in a ~/.claude-* config dir, named by its .claude.json", async () => {
     const credentials = (token: string) => JSON.stringify({ claudeAiOauth: { accessToken: token, expiresAt: NOW + HOUR } });
     const dir = join(home, ".claude-work");

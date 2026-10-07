@@ -261,12 +261,14 @@ function claudeAccount(path: string): Account | null {
 
 /**
  * Where Claude Code keeps each sign-in: the default one, then one per config directory it was
- * pointed at (CLAUDE_CONFIG_DIR, and ~/.claude-* for the usual second account). For such a
+ * pointed at (CLAUDE_CONFIG_DIR, and the signed-in ~/.claude-* ones for the usual second account). For such a
  * directory it names the keychain item after the directory's hash, and keeps .claude.json in it.
  */
 function claudeHomes(ctx: UsageContext): Array<{ source: string; service: string; dir: string; config: string }> {
   const homes = [{ source: "default", service: "Claude Code-credentials", dir: join(ctx.home, ".claude"), config: join(ctx.home, ".claude.json") }];
-  const dirs = [ctx.env["CLAUDE_CONFIG_DIR"], ...siblingDirs(ctx.home, ".claude-")].filter((dir): dir is string => Boolean(dir));
+  // a ~/.claude-* directory is an account only once something signed in there; ~/.claude-mem and the like are not
+  const signedIn = (dir: string) => readText(join(dir, ".credentials.json")) !== null || readText(join(dir, ".claude.json")) !== null;
+  const dirs = [ctx.env["CLAUDE_CONFIG_DIR"], ...siblingDirs(ctx.home, ".claude-").filter(signedIn)].filter((dir): dir is string => Boolean(dir));
   for (const dir of new Set(dirs)) {
     const hash = createHash("sha256").update(dir).digest("hex").slice(0, 8);
     homes.push({ source: dir, service: `Claude Code-credentials-${hash}`, dir, config: join(dir, ".claude.json") });
