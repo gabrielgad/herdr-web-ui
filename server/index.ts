@@ -56,7 +56,8 @@ import {
   worktreeRemove,
 } from "./herdr/client.ts";
 import { type AlertTiming, createPushService, defaultStateDir, handlePushRequest } from "./push.ts";
-import { claudeHeldIsGrey, codexQuestionsCollapsed, handlePromptRequest, isClaudeHeld, heldCandidate, modelListWaits, noteSubmitted, parseInteractivePrompt, promptWaitEnded } from "./prompt.ts";
+import { mayBeAsking, withBlockedPanes } from "./asking-panes.ts";
+import { claudeHeldIsGrey, codexQuestionsCollapsed, handlePromptRequest, isClaudeHeld, heldCandidate, modelListWaits, noteSubmitted, parseInteractivePrompt, piDialogWaits, promptWaitEnded } from "./prompt.ts";
 import { secretPrompt, validSecret } from "../shared/secret-prompt.ts";
 import { PasteImageError, savePaneImage } from "./paste.ts";
 import { PtySession } from "./pty/session.ts";
@@ -706,9 +707,27 @@ export function createServer(
     await omo.refresh(snapshot.panes);
     return omo.apply(snapshot);
   };
+  // herdr's status is not always the agent's: pi's own dialogs (an extension's picker or editor) leave
+  // it idle, and a Claude question can still read done. A pi or Claude pane that herdr calls idle or
+  // done, with a prompt on its screen that the chat draws as a card, reads blocked (INPUT) here too
+  const askingSeen = new Map<string, { at: number; asks: boolean }>();
+  const withAskingPanes = async (snapshot: SessionSnapshot): Promise<SessionSnapshot> => {
+    const quiet = snapshot.panes.filter(mayBeAsking);
+    for (const paneId of askingSeen.keys()) if (!quiet.some((pane) => pane.pane_id === paneId)) askingSeen.delete(paneId);
+    if (quiet.length === 0) return snapshot;
+    const now = Date.now();
+    await Promise.all(quiet.map(async (pane) => {
+      const seen = askingSeen.get(pane.pane_id);
+      if (seen && now - seen.at < 1500) return;
+      const asks = await paneRead({ paneId: pane.pane_id, source: "detection", format: "text" })
+        .then((read) => parseInteractivePrompt(pane.agent ?? "", read.text) !== null || (pane.agent === "pi" && piDialogWaits(read.text)), () => false);
+      askingSeen.set(pane.pane_id, { at: now, asks });
+    }));
+    return withBlockedPanes(snapshot, new Set(quiet.filter((pane) => askingSeen.get(pane.pane_id)?.asks).map((pane) => pane.pane_id)));
+  };
   /** the snapshot clients get: finishes settled, OmO panes named, their running background tasks counted */
   const clientSnapshot = async (): Promise<SessionSnapshot> => {
-    const snapshot = await completions.readSnapshot(rawSnapshot);
+    const snapshot = await withAskingPanes(await completions.readSnapshot(rawSnapshot));
     if (!snapshot.panes.some((pane) => omo.backgroundOf(pane.pane_id) > 0)) return snapshot;
     return { ...snapshot, panes: snapshot.panes.map((pane) => omo.backgroundOf(pane.pane_id) > 0 ? { ...pane, background_tasks: omo.backgroundOf(pane.pane_id) } : pane) };
   };

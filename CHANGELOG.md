@@ -73,6 +73,7 @@ between releases do not reach them. Remote-PC runtime bundles are versioned sepa
   pane or a view yourself and it is back. A shell's notification opens its terminal as before.
   ([#605](https://github.com/devswha/herdr-web-ui/pull/605) by @Xianbei233)
 - A picker or editor a pi extension opens shows in the chat as a card with ↑, ↓, Enter and Esc.
+- A pane waiting on a prompt reads **Input**, not **Ready** or **Done**.
 
 ## [0.4.1] - 2026-10-08
 
