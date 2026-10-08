@@ -225,3 +225,57 @@
     --strip-bg: var(--bg);
   }
 }
+
+/* the reorder grip: dragged with a finger or a pointer; always there on a touch screen, on
+   hover and focus with a pointer, and it does not move the tab's name when it appears */
+.tab-strip-grip {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 28px;
+  margin-right: calc(-1 * var(--space-2));
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.tab-strip-grip svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tab-strip-item:hover .tab-strip-grip,
+.tab-strip-item:focus-within .tab-strip-grip,
+.tab-strip-item.is-active .tab-strip-grip {
+  display: inline-flex;
+}
+
+@media (hover: none) {
+  .tab-strip-item .tab-strip-grip {
+    display: inline-flex;
+  }
+}
+
+.tab-strip-grip:active {
+  cursor: grabbing;
+}
+
+.tab-strip-item.is-dragging {
+  opacity: 0.5;
+}
+
+.tab-strip-item.is-drop-target {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.tab-strip-item.is-active.is-drop-target {
+  box-shadow: inset 2px 0 0 var(--accent), inset 0 -2px 0 var(--accent);
+}

@@ -207,6 +207,8 @@ export const KO: Record<string, string> = {
   "Close workspace {name}?": "워크스페이스 {name}을(를) 닫을까요?",
   "{n} panes close with it, and the agents in them stop.": "패널 {n}개가 함께 닫히고, 안의 에이전트가 멈춥니다.",
   "Rename failed: {reason}": "이름 바꾸기 실패: {reason}",
+  "Reorder tab {name}": "탭 {name} 순서 변경",
+  "Drag to reorder · Alt+←/→": "끌어서 순서 변경 · Alt+←/→",
   "Reorder failed: {reason}": "순서 바꾸기 실패: {reason}",
 
   // ---- PCs sidebar ----

@@ -45,6 +45,7 @@ import {
   sessionSnapshot,
   tabClose,
   tabCreate,
+  tabMove,
   tabRename,
   workspaceClose,
   workspaceCreate,
@@ -1625,6 +1626,29 @@ export function createServer(
             // herdr emits pane.closed for the tab's panes, and the collector tells the clients
             await tabClose(payload.tab_id);
           }
+          return jsonResponse({ ok: true });
+        } catch (error) {
+          return errorResponse(error);
+        }
+      }
+
+      // a tab's place among its workspace's tabs: herdr's tab.move, so its own tab row follows
+      if (pathname === "/api/tab/move") {
+        if (request.method !== "POST") return badRequest("method_not_allowed", "use POST");
+        let payload: { tab_id?: unknown; insert_index?: unknown };
+        try {
+          payload = (await request.json()) as typeof payload;
+        } catch {
+          return badRequest("invalid_json", "request body must be JSON");
+        }
+        if (!isJsonObject(payload)) return badRequest("invalid_body", "request body must be a JSON object");
+        if (typeof payload.tab_id !== "string" || payload.tab_id.length === 0) return badRequest("missing_tab_id", "tab_id is required");
+        if (typeof payload.insert_index !== "number" || !Number.isInteger(payload.insert_index) || payload.insert_index < 0) {
+          return badRequest("invalid_index", "insert_index must be a non-negative integer");
+        }
+        try {
+          await tabMove(payload.tab_id, payload.insert_index);
+          broadcastAll({ type: "session-changed" });
           return jsonResponse({ ok: true });
         } catch (error) {
           return errorResponse(error);

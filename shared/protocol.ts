@@ -104,6 +104,8 @@ export type { Machine, MachineEvent, PaneTarget, SetupJob, SetupRequest, SetupAc
  *         herdr would keep it as the name)
  *  POST   /api/tab/close  { tab_id } -> { ok: true } (tab.close: every pane in the tab closes, and
  *         a workspace's last tab takes the workspace with it)
+ *  POST   /api/tab/move   { tab_id, insert_index } -> { ok: true } (tab.move: the tab's place among its
+ *         workspace's tabs; herdr's order is the snapshot's, not `number`, which stays with the tab)
  *  POST   /api/workspace/rename { workspace_id, label } -> { ok: true }
  *  POST   /api/workspace/move   { workspace_id, insert_index } -> { ok: true } (sidebar reorder)
  *  POST   /api/workspace/close  { workspace_id, close_group? } -> { ok: true } (close_group takes the

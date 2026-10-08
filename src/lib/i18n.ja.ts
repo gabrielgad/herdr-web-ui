@@ -209,6 +209,8 @@ export const JA: Record<string, string> = {
   "Close workspace {name}?": "ワークスペース {name} を閉じますか？",
   "{n} panes close with it, and the agents in them stop.": "ペイン {n} 個も一緒に閉じ、中のエージェントは停止します。",
   "Rename failed: {reason}": "名前を変更できませんでした: {reason}",
+  "Reorder tab {name}": "タブ {name} を並べ替え",
+  "Drag to reorder · Alt+←/→": "ドラッグで並べ替え · Alt+←/→",
   "Reorder failed: {reason}": "並べ替えできませんでした: {reason}",
 
   // ---- PCs sidebar ----

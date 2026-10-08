@@ -12,7 +12,7 @@
  * costs more than the tab: an agent still at work in it, or the workspace's last tab.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import { ChevronDown, Pencil, Plus, Terminal, X } from "lucide-react";
+import { ChevronDown, GripVertical, Pencil, Plus, Terminal, X } from "lucide-react";
 
 import "./TabStrip.css";
 
@@ -21,6 +21,7 @@ import { ApiError } from "../lib/api.ts";
 import { useFacesArrived } from "../lib/fontFaces.ts";
 import { focusWorkspaceListToggle } from "../lib/focus.ts";
 import { useT } from "../lib/i18n.ts";
+import { orderBy, useDragSort, useOptimisticOrder } from "../lib/dragSort.ts";
 import { customTabLabel, tabLabel } from "../lib/tabName.ts";
 import { STRIP_AT_REST, stripPlaced, stripScrolled, stripSelected, type StripScroll } from "../lib/tabStripScroll.ts";
 import { PANE_TABPANEL_ID, paneTabPanelLabel } from "../lib/paneRegion.ts";
@@ -48,7 +49,7 @@ export interface TabStripProps {
 export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNewTab }: TabStripProps) {
   const t = useT();
   const machineId = useMachineId();
-  const { closeTab, renameTab } = useMachineApi();
+  const { closeTab, moveTab, renameTab } = useMachineApi();
   const strip = useRef<HTMLDivElement>(null);
   const [picker, setPicker] = useState<{ anchor: HTMLElement; tab: HerdrTab } | null>(null);
   const [editing, setEditing] = useState<{ tabId: string; value: string } | null>(null);
@@ -66,7 +67,11 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
   const latest = useRef({ machineId, workspaceId: workspace.workspace_id, tabId: selectedPane.tab_id });
   latest.current = { machineId, workspaceId: workspace.workspace_id, tabId: selectedPane.tab_id };
   const panes = rosterPanes(snapshot.panes.filter((pane) => pane.workspace_id === workspace.workspace_id), selectedPane.pane_id);
-  const tabs = snapshot.tabs.filter((tab) => tab.workspace_id === workspace.workspace_id).sort((a, b) => a.number - b.number);
+  // herdr's own order: a tab's number stays with it when it moves, its place in the snapshot does not
+  const serverTabs = snapshot.tabs.filter((tab) => tab.workspace_id === workspace.workspace_id);
+  const order = useOptimisticOrder(serverTabs.map((tab) => tab.tab_id), moveTab, (reason) => setError(t("Reorder failed: {reason}", { reason: said(reason) })));
+  const tabs = orderBy(serverTabs, (tab) => tab.tab_id, order.ids);
+  const sort = useDragSort("tabs", order.move);
   const nameOf = (tab: HerdrTab): string => sent?.tabId === tab.tab_id ? sent.label : tabLabel(tab, t, tabs.findIndex((candidate) => candidate.tab_id === tab.tab_id) + 1);
 
   useEffect(() => {
@@ -227,6 +232,13 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
     }
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") return;
     event.preventDefault();
+    // Alt+arrow moves the tab itself, as the grip does
+    if (event.altKey && event.key !== "Home" && event.key !== "End") {
+      const tab = tabs[index];
+      const beside = tabs[index + (event.key === "ArrowLeft" ? -1 : 1)];
+      if (tab && beside) { order.move(tab.tab_id, beside.tab_id); focusTab(tab.tab_id); }
+      return;
+    }
     const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowLeft" ? -1 : 1) + buttons.length) % buttons.length;
     buttons[next]?.focus();
   };
@@ -268,7 +280,12 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
           const pickerOpen = picker?.tab.tab_id === tab.tab_id;
           const name = nameOf(tab);
           return (
-            <div className={`tab-strip-item${active ? " is-active" : ""}${own.length > 1 ? " has-panes" : ""}${editing?.tabId === tab.tab_id ? " is-editing" : ""}`} key={tab.tab_id}>
+            <div className={`tab-strip-item${active ? " is-active" : ""}${own.length > 1 ? " has-panes" : ""}${editing?.tabId === tab.tab_id ? " is-editing" : ""}${sort.draggingId === tab.tab_id ? " is-dragging" : ""}${sort.overId === tab.tab_id && sort.draggingId !== tab.tab_id ? " is-drop-target" : ""}`} key={tab.tab_id} data-sort-group="tabs" data-sort-id={tab.tab_id}>
+              {tabs.length > 1 && editing?.tabId !== tab.tab_id && (
+                <button type="button" className="tab-strip-grip" tabIndex={-1} aria-label={t("Reorder tab {name}", { name })} title={t("Drag to reorder · Alt+←/→")} {...sort.grip(tab.tab_id)}>
+                  <GripVertical aria-hidden="true" />
+                </button>
+              )}
               {editing?.tabId === tab.tab_id ? (
                 <input
                   className="input tab-strip-rename"

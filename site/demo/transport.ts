@@ -512,6 +512,20 @@ async function route(url: URL, method: string, init: RequestInit | undefined, in
     structureChanged();
     return json({ ok: true });
   }
+  if (path === "/api/tab/move") {
+    const body = await bodyOf(init, input);
+    const snap = snapshot();
+    const tab = snap.tabs.find((t) => t.tab_id === body["tab_id"]);
+    if (!tab) return error("tab_not_found", "no such tab", 404);
+    // herdr's index counts before the tab leaves its place
+    const before = snap.tabs.filter((t) => t.workspace_id === tab.workspace_id);
+    const siblings = before.filter((t) => t !== tab);
+    const wanted = Math.max(0, Math.min(before.length, Number(body["insert_index"] ?? 0)));
+    siblings.splice(wanted > before.indexOf(tab) ? wanted - 1 : wanted, 0, tab);
+    snap.tabs = [...snap.tabs.filter((t) => t.workspace_id !== tab.workspace_id), ...siblings];
+    structureChanged();
+    return json({ ok: true });
+  }
   if (path === "/api/tab/close") {
     const body = await bodyOf(init, input);
     const snap = snapshot();

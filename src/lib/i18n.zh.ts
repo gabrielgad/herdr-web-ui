@@ -211,6 +211,8 @@ export const ZH: Record<string, string> = {
   "Close workspace {name}?": "关闭工作区 {name}？",
   "{n} panes close with it, and the agents in them stop.": "窗格 {n} 个会一同关闭，其中的代理会停止。",
   "Rename failed: {reason}": "重命名失败：{reason}",
+  "Reorder tab {name}": "重新排序标签页 {name}",
+  "Drag to reorder · Alt+←/→": "拖动以重新排序 · Alt+←/→",
   "Reorder failed: {reason}": "调整顺序失败：{reason}",
 
   // ---- PCs sidebar ----
