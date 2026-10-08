@@ -6,6 +6,13 @@ import { FONT_FAMILY_MAX_CHARS } from "./fontFamily.ts";
 import { DEFAULT_KEY_BAR_ITEMS, migrateKeyBarItems } from "./keyBar.ts";
 import { alertPrefs, CHAT_FONT_MAX, CHAT_FONT_MIN, CHAT_LANE_MAX_REM, CHAT_LANE_MIN, CHAT_WIDTHS, chatFontSize, chatLaneLength, chatLaneWidth, DEFAULT_SETTINGS, QUICK_REPLIES_MAX, QUICK_REPLY_MAX_CHARS, quickReplyButtons, sanitizeSettings, terminalTheme, forgetPaneViews, VOICE_BUTTONS, wantsVoiceInput } from "./settings.ts";
 
+it("takes the device's clock unless 12 or 24 hours is chosen", () => {
+  expect(sanitizeSettings({}).timeFormat).toBe("auto");
+  expect(sanitizeSettings({ timeFormat: "24h" }).timeFormat).toBe("24h");
+  expect(sanitizeSettings({ timeFormat: "12h" }).timeFormat).toBe("12h");
+  expect(sanitizeSettings({ timeFormat: "military" }).timeFormat).toBe("auto");
+});
+
 it("keeps the screen wake lock off until this device explicitly enables it", () => {
   expect(DEFAULT_SETTINGS.keepScreenOn).toBe(false);
   expect(sanitizeSettings({}).keepScreenOn).toBe(false);

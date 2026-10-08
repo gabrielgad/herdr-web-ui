@@ -91,10 +91,10 @@ interface ChatState {
 const EMPTY_STATE: ChatState = { source: "conversation", turns: [], messages: [], truncated: false };
 
 
-function formatTime(ts: string | null): string | null {
+function formatTime(ts: string | null, timeFormat: "auto" | "12h" | "24h" = "auto"): string | null {
   if (ts === null) return null;
   const date = new Date(ts);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleTimeString(currentLocale(), { hour: "2-digit", minute: "2-digit", timeZone: displayTimeZone() });
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleTimeString(currentLocale(), { hour: "2-digit", minute: "2-digit", timeZone: displayTimeZone(), ...(timeFormat === "auto" ? {} : { hour12: timeFormat === "12h" }) });
 }
 
 function plainText(markdown: string): string {
@@ -413,6 +413,7 @@ interface TurnProps {
   /** ...and "Needs you" while the agent is blocked */
   waiting: boolean;
   showThinking: boolean;
+  timeFormat?: "auto" | "12h" | "24h";
 }
 
 const TASK_RESULT_ICONS: Record<OmoTaskResult["status"], ComponentType<LucideProps>> = { completed: CircleCheck, failed: CircleX, cancelled: CircleSlash };
@@ -455,9 +456,9 @@ function noticeLabel(t: ReturnType<typeof useT>, notice: Extract<ConversationPar
 }
 
 // a turn that did not change keeps its object across polls: skip re-rendering it
-const Turn = memo(function Turn({ paneId, turn, live, waiting, showThinking }: TurnProps) {
+const Turn = memo(function Turn({ paneId, turn, live, waiting, showThinking, timeFormat }: TurnProps) {
   const t = useT();
-  const time = formatTime(turn.ts);
+  const time = formatTime(turn.ts, timeFormat);
   const compact = turn.parts.find((part): part is Extract<ConversationPart, { kind: "compact" }> => part.kind === "compact");
   if (compact !== undefined) {
     return <details className="chat-compact">
@@ -888,7 +889,7 @@ export const ChatView = memo(function ChatView({ paneId, refreshKey, sentKey = 0
             const last = index === turns.length - 1;
             const live = isLiveWorkTurn(turn, last, agentStatus, finishedBeforeSend);
             return <RenderBoundary key={`${paneId}:${historyId ?? ""}:${turn.role}:${turn.ts ?? index}`} resetKey={turnRevision(turn)} fallback={() => <p className="chat-inline-state chat-inline-error">{t("This message can't be shown here. The terminal has it.")}</p>}>
-              <Turn paneId={paneId} turn={turn} live={live} waiting={isWaitingWorkTurn(live, agentStatus)} showThinking={settings.showThinking} />
+              <Turn paneId={paneId} turn={turn} live={live} waiting={isWaitingWorkTurn(live, agentStatus)} showThinking={settings.showThinking} timeFormat={settings.timeFormat} />
             </RenderBoundary>;
           })
         : agent !== null

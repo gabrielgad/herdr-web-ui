@@ -151,6 +151,9 @@ function AppearancePage() {
       <SettingsRow label={t("Density")}>
         <Segmented label={t("Density")} value={settings.density} onChange={(density) => update({ density })} options={[{ value: "comfortable", label: t("Comfortable") }, { value: "compact", label: t("Compact") }]} />
       </SettingsRow>
+      <SettingsRow label={t("Time format")} description={t("The clock on chat messages")}>
+        <Segmented label={t("Time format")} value={settings.timeFormat} onChange={(timeFormat) => update({ timeFormat })} options={[{ value: "auto", label: t("Auto") }, { value: "12h", label: t("12-hour") }, { value: "24h", label: t("24-hour") }]} />
+      </SettingsRow>
       <SettingsRow label={t("Language")} description={t("Follows the browser unless you choose one")} htmlFor="settings-language">
         <select id="settings-language" className="select settings-select" value={settings.language} onChange={(event) => update({ language: event.target.value as typeof settings.language })}>
           {LANGUAGE_SETTINGS.map((language) => <option key={language} value={language}>{language === "system" ? t("System") : LANGUAGE_NAMES[language]}</option>)}
