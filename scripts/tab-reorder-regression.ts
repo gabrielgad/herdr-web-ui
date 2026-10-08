@@ -54,7 +54,9 @@ export async function checkTabReorder(browser: Browser, origin: string): Promise
     await page.mouse.move(grip.x, grip.y);
     await page.mouse.down();
     for (const step of [0.25, 0.5, 0.75, 1]) await page.mouse.move(grip.x + (onto.x - grip.x) * step, grip.y + (onto.y - grip.y) * step);
+    assert.equal(await page.locator("body > [data-drag-ghost]").count(), 1, "a copy of the tab follows the pointer");
     await page.mouse.up();
+    await page.locator("[data-drag-ghost]").waitFor({ state: "detached" });
     await until(page, ["two", "three", "one"], "herdr has the dragged tab last");
     assert.deepEqual(await shown(), ["two", "three", "one"], "the strip follows");
 
@@ -83,7 +85,9 @@ export async function checkTabReorder(browser: Browser, origin: string): Promise
     const to = await center(phoneItem("two"));
     await touch(cdp, "touchStart", from);
     for (const step of [0.25, 0.5, 0.75, 1]) await touch(cdp, "touchMove", { x: from.x + (to.x - from.x) * step, y: from.y + (to.y - from.y) * step });
+    assert.equal(await phonePage.locator("body > [data-drag-ghost]").count(), 1, "a copy of the tab follows the finger");
     await touch(cdp, "touchEnd");
+    await phonePage.locator("[data-drag-ghost]").waitFor({ state: "detached" });
     await until(phonePage, ["one", "two", "three"], "a finger moved the last tab ahead of the first");
     assert.deepEqual(errors, []);
     console.log("PASS tabs are dragged by their grip with a mouse or a finger, and moved with Alt+arrows, in herdr's order");

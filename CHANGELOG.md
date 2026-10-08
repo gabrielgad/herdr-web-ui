@@ -29,6 +29,7 @@ between releases do not reach them. Remote-PC runtime bundles are versioned sepa
 - Tabs can be reordered. Drag a tab's grip with a finger or a mouse, or press Alt+Left/Right on a focused tab.
 - Press and hold a tab, or right-click it, for its menu, which now has New pane to the right, New pane below and New tab.
 - Workspace rows have a grip on touch screens, and a press and hold opens their menu. Moving a row down lands it after its target.
+- A copy of a tab or workspace row follows the finger or pointer while it is dragged by its grip.
 
 ### Changed
 - The default mobile terminal key bar puts Esc, Tab and Ctrl+C first, before the held modifiers

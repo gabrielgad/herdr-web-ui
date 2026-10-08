@@ -73,7 +73,12 @@ export async function checkSidebarTouch(browser: Browser, origin: string): Promi
       const target = await center(header(onto));
       await touch(cdp, "touchStart", grip);
       for (const step of [0.25, 0.5, 0.75, 1]) await touch(cdp, "touchMove", { x: grip.x + (target.x - grip.x) * step, y: grip.y + (target.y - grip.y) * step });
+      // a copy of the row follows the finger, and it does not take the drop
+      assert.equal(await page.locator("body > [data-drag-ghost]").count(), 1, "a copy of the row follows the finger");
+      const ghost = await page.locator("[data-drag-ghost]").boundingBox();
+      assert.ok(ghost && Math.abs(ghost.y + ghost.height / 2 - target.y) < ghost.height, "the copy is under the finger");
       await touch(cdp, "touchEnd");
+      await page.locator("[data-drag-ghost]").waitFor({ state: "detached" });
     };
     await drag(a, c);
     const until = async (want: string[], what: string): Promise<void> => {

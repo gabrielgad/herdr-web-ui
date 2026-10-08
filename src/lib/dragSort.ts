@@ -63,6 +63,44 @@ export function useOptimisticOrder(serverIds: readonly string[], send: (id: stri
   return { ids, move };
 }
 
+/**
+ * A copy of the dragged item that follows the pointer, so a finger does not hide what it moves.
+ * It sits on the body (a drawer's transform would otherwise become its frame) with the item's
+ * computed styles written onto it, since the stylesheet's selectors reach it only through its parents.
+ */
+export interface DragGhost {
+  move: (clientX: number, clientY: number) => void;
+  remove: () => void;
+}
+
+export function createDragGhost(item: HTMLElement, clientX: number, clientY: number): DragGhost {
+  const rect = item.getBoundingClientRect();
+  const ghost = item.cloneNode(true) as HTMLElement;
+  const inline = (from: Element, to: Element): void => {
+    const style = getComputedStyle(from);
+    for (const name of Array.from(style)) (to as HTMLElement).style.setProperty(name, style.getPropertyValue(name));
+    to.removeAttribute("id");
+    to.removeAttribute("data-sort-id");
+    to.removeAttribute("data-sort-group");
+    Array.from(from.children).forEach((child, index) => { const copy = to.children[index]; if (copy) inline(child, copy); });
+  };
+  inline(item, ghost);
+  Object.assign(ghost.style, {
+    position: "fixed", left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`,
+    margin: "0", pointerEvents: "none", zIndex: "2147483000", opacity: "0.92", transition: "none", animation: "none",
+    boxShadow: "0 10px 28px rgba(0, 0, 0, 0.45)", transformOrigin: "50% 50%",
+  });
+  // the copied styles gave every child its own pointer-events: the point under the finger must reach the row below
+  ghost.querySelectorAll<HTMLElement>("*").forEach((node) => { node.style.pointerEvents = "none"; });
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.setAttribute("data-drag-ghost", "");
+  document.body.appendChild(ghost);
+  return {
+    move: (x, y) => { ghost.style.transform = `translate(${x - clientX}px, ${y - clientY}px) scale(1.03)`; },
+    remove: () => ghost.remove(),
+  };
+}
+
 export interface DragSort {
   draggingId: string | null;
   overId: string | null;
@@ -81,20 +119,26 @@ export function useDragSort(group: string, onDrop: (id: string, targetId: string
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const over = useRef<string | null>(null);
+  const ghost = useRef<DragGhost | null>(null);
+  useEffect(() => () => ghost.current?.remove(), []);
   const targetAt = (event: PointerEvent<HTMLElement>): string | null => {
     const item = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>(`[data-sort-group="${CSS.escape(group)}"]`);
     return item?.dataset["sortId"] ?? null;
   };
-  const end = (): void => { over.current = null; setDraggingId(null); setOverId(null); };
+  const end = (): void => { over.current = null; ghost.current?.remove(); ghost.current = null; setDraggingId(null); setOverId(null); };
   const grip: DragSort["grip"] = (id) => ({
     onPointerDown: (event) => {
       if (event.button !== 0) return;
       event.stopPropagation();
       event.currentTarget.setPointerCapture(event.pointerId);
+      const item = event.currentTarget.closest<HTMLElement>(`[data-sort-group="${CSS.escape(group)}"]`);
+      ghost.current?.remove();
+      ghost.current = item ? createDragGhost(item, event.clientX, event.clientY) : null;
       setDraggingId(id);
     },
     onPointerMove: (event) => {
       if (draggingId !== id) return;
+      ghost.current?.move(event.clientX, event.clientY);
       const target = targetAt(event);
       over.current = target;
       setOverId(target);
