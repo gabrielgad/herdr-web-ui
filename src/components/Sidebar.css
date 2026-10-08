@@ -265,6 +265,30 @@ button.sidebar-section-label:focus-visible { outline-offset: calc(var(--ring-off
   opacity: 0.55;
 }
 
+/* where a grip-dragged row would land */
+.workspace.is-drop-target > .workspace-header {
+  box-shadow: inset 0 0 0 var(--hairline) var(--accent);
+}
+
+/* the grip is dragged with a finger: the browser must not scroll or select under it */
+.sidebar-drag-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+/* a held row is not a text selection or a link's callout */
+.workspace-header {
+  -webkit-touch-callout: none;
+}
+
+@media (pointer: coarse) {
+  .workspace-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
 /* the field's text stays where the title was, and its edge clear of the mark */
 .workspace-rename-input,
 .pane-rename-input {

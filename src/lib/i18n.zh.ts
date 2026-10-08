@@ -216,6 +216,7 @@ export const ZH: Record<string, string> = {
   "New pane to the right": "在右侧新建窗格",
   "New pane below": "在下方新建窗格",
   "New pane failed: {reason}": "新建窗格失败：{reason}",
+  "Drag to reorder": "拖动以重新排序",
   "Reorder failed: {reason}": "调整顺序失败：{reason}",
 
   // ---- PCs sidebar ----

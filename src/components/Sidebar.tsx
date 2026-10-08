@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from "react";
-import { Ellipsis, Folder, FolderOpen, GitBranch, Layers, LoaderCircle, Pencil, Plus, Terminal, Trash2, TriangleAlert, X } from "lucide-react";
+import { Ellipsis, Folder, FolderOpen, GitBranch, GripVertical, Layers, LoaderCircle, Pencil, Plus, Terminal, Trash2, TriangleAlert, X } from "lucide-react";
 
 import "./Sidebar.css";
 
@@ -20,9 +20,23 @@ import { useSidebarActivity } from "../lib/sidebarActivity.tsx";
 import { useSettings } from "../lib/settings.ts";
 import { useWorktreeBranches } from "../lib/useWorktreeBranches.ts";
 import { worktreeLabel } from "../lib/worktreeName.ts";
+import { herdrIndex, useDragSort, useHold } from "../lib/dragSort.ts";
 import { paneMark, sidebarAgents, workspaceAgentLabels } from "../lib/sidebarAgents.ts";
 
 const ERROR_NOTE_MS = 5000;
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia?.(query).matches === true);
+  useEffect(() => {
+    const media = window.matchMedia?.(query);
+    if (!media) return;
+    const refresh = () => setMatches(media.matches);
+    refresh();
+    media.addEventListener("change", refresh);
+    return () => media.removeEventListener("change", refresh);
+  }, [query]);
+  return matches;
+}
 
 const worktreeCollapsedKey = (machineId: string, repoKey: string) => `herdr-web-ui:worktree-group-collapsed:${machineId}:${repoKey}`;
 function storedWorktreeCollapsed(machineId: string, repoKeys: string[]): Set<string> {
@@ -148,6 +162,9 @@ export function Sidebar({ snapshot, online, selectedPaneId, actions }: SidebarPr
   const [workspaceLabel, setWorkspaceLabel] = useState("");
   const [workspaceOrder, setWorkspaceOrder] = useState<string[]>([]);
   const [dragWorkspaceId, setDragWorkspaceId] = useState<string | null>(null);
+  // a touch screen has no HTML5 drag: the row is moved by a grip, and a press and hold opens its menu
+  const touch = useMediaQuery("(pointer: coarse)");
+  const menuOpeners = useRef(new Map<string, (anchor: HTMLElement) => void>());
   const [inlineError, setInlineError] = useState<InlineError | null>(null);
   const rosterId = useId();
   const workspaceRoot = useRef<HTMLDivElement>(null);
@@ -273,19 +290,17 @@ export function Sidebar({ snapshot, online, selectedPaneId, actions }: SidebarPr
 
   const closeMenu = useCallback(() => setMenu(null), []);
 
-  // A right-click on a row opens the menu its ⋯ opens, under that button, which also takes the
-  // focus back when the menu goes. A name being edited keeps the browser's own menu, for its paste.
-  // A finger's long press is left alone: it is how a row is picked up to be dragged, and the ⋯
-  // is always there on touch.
-  const onRowContextMenu = (event: MouseEvent<HTMLElement>, toggle: (anchor: HTMLElement) => void): void => {
+  // A right-click, or a press and hold on a touch screen, opens the menu a row's ⋯ opens, under
+  // that button, which also takes the focus back when the menu goes. A name being edited keeps
+  // the browser's own menu, for its paste. A finger drags a row by its grip, so a hold is free.
+  const hold = useHold((element) => {
+    const id = element.closest<HTMLElement>("[data-workspace]")?.dataset["workspace"];
+    const anchor = element.querySelector<HTMLElement>(".row-menu-toggle");
+    if (id && anchor) menuOpeners.current.get(id)?.(anchor);
+  });
+  const onRowContextMenu = (event: MouseEvent<HTMLElement>): void => {
     if ((event.target as HTMLElement).closest("input")) return;
-    // Chrome and Safari say what pressed; Firefox does not, so there the device's main pointer decides
-    const pointer = (event.nativeEvent as PointerEvent).pointerType;
-    if (pointer ? pointer === "touch" : window.matchMedia("(pointer: coarse)").matches) return;
-    const anchor = event.currentTarget.querySelector<HTMLElement>(".row-menu-toggle");
-    if (!anchor) return;
-    event.preventDefault();
-    toggle(anchor);
+    hold.onContextMenu(event);
   };
 
   // A close takes the workspace with it, so it asks first, as herdr's ui.confirm_close does.
@@ -407,7 +422,7 @@ export function Sidebar({ snapshot, online, selectedPaneId, actions }: SidebarPr
     next.splice(sourceIndex, 1);
     next.splice(boundedIndex, 0, workspaceId);
     setWorkspaceOrder(next);
-    void moveWorkspace(workspaceId, boundedIndex).catch((reason: unknown) => {
+    void moveWorkspace(workspaceId, herdrIndex(sourceIndex, boundedIndex)).catch((reason: unknown) => {
       // only this move's own optimistic order is rolled back: if a later reorder has landed in
       // the meantime, its order is the newer one and reverting to `previous` would undo it
       setWorkspaceOrder((current) => (current.length === next.length && current.every((id, index) => id === next[index]) ? previous : current));
@@ -464,6 +479,11 @@ export function Sidebar({ snapshot, online, selectedPaneId, actions }: SidebarPr
     return parent && parent.children.some((child) => child.workspace_id === targetId) ? workspaceOrder.indexOf(targetId) : null;
   };
 
+  const workspaceSort = useDragSort("workspaces", (sourceId, targetId) => {
+    const index = dropIndex(sourceId, targetId);
+    if (index !== null) reorderWorkspace(sourceId, index);
+  });
+
   const onRowKeyDown = (event: KeyboardEvent<HTMLDivElement>, workspaceId: string): void => {
     if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
     event.preventDefault();
@@ -497,16 +517,22 @@ export function Sidebar({ snapshot, online, selectedPaneId, actions }: SidebarPr
     const editingPane = editingPaneId === pane.pane_id;
     const menuOpen = menu?.workspace.workspace_id === workspace.workspace_id;
     const contentsId = `${rosterId}-worktrees-${encodeURIComponent(repoKey ?? workspace.workspace_id)}`;
-    const toggleMenu = (anchor: HTMLElement): void => setMenu(menuOpen ? null : { anchor, workspace, pane, title: rowTitle, place: [branchNote, ...paths].filter(Boolean).join(" · ") || workspace.label });
+    const openMenu = (anchor: HTMLElement): void => setMenu({ anchor, workspace, pane, title: rowTitle, place: [branchNote, ...paths].filter(Boolean).join(" · ") || workspace.label });
+    const toggleMenu = (anchor: HTMLElement): void => { if (menuOpen) setMenu(null); else openMenu(anchor); };
+    menuOpeners.current.set(workspace.workspace_id, openMenu);
+    const dragging = dragWorkspaceId === workspace.workspace_id || workspaceSort.draggingId === workspace.workspace_id;
+    const dropTarget = workspaceSort.overId === workspace.workspace_id && workspaceSort.draggingId !== workspace.workspace_id;
     return <li
-      className={`workspace workspace-group pane-item${selected ? " is-selected" : ""}${collapsed ? " is-collapsed" : ""}${dragWorkspaceId === workspace.workspace_id ? " is-dragging" : ""}`}
+      className={`workspace workspace-group pane-item${selected ? " is-selected" : ""}${collapsed ? " is-collapsed" : ""}${dragging ? " is-dragging" : ""}${dropTarget ? " is-drop-target" : ""}`}
       key={workspace.workspace_id}
       data-workspace={workspace.workspace_id}
+      data-sort-group="workspaces"
+      data-sort-id={workspace.workspace_id}
       data-branch={branchTitle ?? undefined}
       onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }}
       onDrop={(event) => onDrop(event, workspace.workspace_id)}
     >
-      <div className="workspace-header" onContextMenu={(event) => onRowContextMenu(event, toggleMenu)}>
+      <div className="workspace-header" {...hold} onContextMenu={onRowContextMenu}>
         {/* a workspace leads with its folder, which is the fold when linked worktrees sit under it */}
         {nested ? null : children.length > 0 && repoKey !== undefined ? <button
           type="button"
@@ -521,7 +547,7 @@ export function Sidebar({ snapshot, online, selectedPaneId, actions }: SidebarPr
           className="pane-select workspace-select"
           role="button"
           tabIndex={0}
-          draggable={!editingWorkspace && !editingPane}
+          draggable={!touch && !editingWorkspace && !editingPane}
           onDragStart={(event) => { if (!editingWorkspace && !editingPane) onDragStart(event, workspace.workspace_id); }}
           onDragEnd={() => setDragWorkspaceId(null)}
           aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
@@ -585,6 +611,11 @@ export function Sidebar({ snapshot, online, selectedPaneId, actions }: SidebarPr
           </span>
         </div>
         <div className="workspace-actions">
+          {touch && orderedWorkspaces.length > 1 && !editingWorkspace && (
+            <button type="button" className="sidebar-row-action sidebar-drag-handle" tabIndex={-1} aria-label={t("Reorder workspace {name}", { name: workspace.label })} title={t("Drag to reorder")} {...workspaceSort.grip(workspace.workspace_id)}>
+              <GripVertical aria-hidden="true" />
+            </button>
+          )}
           <button type="button" className="sidebar-row-action row-menu-toggle" aria-label={t("More for {title}", { title: rowTitle })} aria-haspopup="menu" aria-expanded={menuOpen} onClick={(event) => toggleMenu(event.currentTarget)}>
             <Ellipsis aria-hidden="true" />
           </button>

@@ -7,10 +7,15 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 
 /**
- * `ids` with `id` moved to where `targetId` is, and the index herdr is told: null when nothing moves.
- * herdr counts the index before the item leaves its place and inserts ahead of the item there,
- * so a move forward names the slot after the target.
+ * The index herdr takes for an item moved from place `from` to place `to` (places in the list as it
+ * stands, then as it ends up). herdr counts before the item leaves and inserts ahead of the item
+ * there, so a move forward names the slot after the target.
  */
+export function herdrIndex(from: number, to: number): number {
+  return from < to ? to + 1 : to;
+}
+
+/** `ids` with `id` moved to where `targetId` is, and the index herdr is told: null when nothing moves. */
 export function moveIds(ids: readonly string[], id: string, targetId: string): { order: string[]; index: number } | null {
   const from = ids.indexOf(id);
   const to = ids.indexOf(targetId);
@@ -18,7 +23,7 @@ export function moveIds(ids: readonly string[], id: string, targetId: string): {
   const order = [...ids];
   order.splice(from, 1);
   order.splice(to, 0, id);
-  return { order, index: from < to ? to + 1 : to };
+  return { order, index: herdrIndex(from, to) };
 }
 
 /** `items` in the order of `ids`; what `ids` does not name keeps its place after the named ones. */
@@ -112,6 +117,29 @@ const HOLD_MS = 450;
 const HOLD_SLOP_PX = 10;
 
 /**
+ * A finger that lifts soon after a hold can still be taken for a tap, and the browser then sends
+ * the mouse events of one to whatever is under it by then: the menu the hold opened. Those events,
+ * until a moment after the finger lifts, go nowhere.
+ */
+function swallowEmulatedMouse(): void {
+  const types = ["mousedown", "mouseup", "click"] as const;
+  const stop = (event: Event): void => { event.preventDefault(); event.stopImmediatePropagation(); };
+  let released = false;
+  const release = (): void => {
+    if (released) return;
+    released = true;
+    for (const type of types) window.removeEventListener(type, stop, true);
+    window.removeEventListener("pointerup", lifted, true);
+    window.removeEventListener("pointercancel", lifted, true);
+  };
+  const lifted = (): void => { window.setTimeout(release, 200); };
+  for (const type of types) window.addEventListener(type, stop, true);
+  window.addEventListener("pointerup", lifted, true);
+  window.addEventListener("pointercancel", lifted, true);
+  window.setTimeout(release, 20_000);
+}
+
+/**
  * Press and hold on a touch screen (or a pen), and the right button of a mouse: `onHold` gets the
  * element held, for a menu to anchor to. A finger that moves is a scroll, not a hold. The click
  * that ends a hold is swallowed, so the row under the finger does not also open.
@@ -126,10 +154,11 @@ export function useHold(onHold: (element: HTMLElement) => void) {
     origin.current = null;
   };
   useEffect(() => cancel, []);
-  const fire = (element: HTMLElement): void => {
+  const fire = (element: HTMLElement, touching: boolean): void => {
     if (Date.now() - heldAt.current < 800) return;
     heldAt.current = Date.now();
     cancel();
+    if (touching) swallowEmulatedMouse();
     onHold(element);
   };
   return {
@@ -137,7 +166,7 @@ export function useHold(onHold: (element: HTMLElement) => void) {
       if (event.pointerType === "mouse") return;
       const element = event.currentTarget;
       origin.current = { x: event.clientX, y: event.clientY };
-      timer.current = window.setTimeout(() => fire(element), HOLD_MS);
+      timer.current = window.setTimeout(() => fire(element, true), HOLD_MS);
     },
     onPointerMove: (event: PointerEvent<HTMLElement>): void => {
       const start = origin.current;
@@ -148,10 +177,11 @@ export function useHold(onHold: (element: HTMLElement) => void) {
     onPointerLeave: cancel,
     onContextMenu: (event: MouseEvent<HTMLElement>): void => {
       event.preventDefault();
-      fire(event.currentTarget);
+      fire(event.currentTarget, false);
     },
     onClickCapture: (event: MouseEvent<HTMLElement>): void => {
-      if (Date.now() - heldAt.current < 800) { event.preventDefault(); event.stopPropagation(); }
+      // a click from the keyboard (detail 0) is not the lift of a finger or button
+      if (event.detail > 0 && Date.now() - heldAt.current < 800) { event.preventDefault(); event.stopPropagation(); }
     },
   };
 }

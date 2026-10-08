@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { moveIds, orderBy, sameIds } from "./dragSort.ts";
+import { herdrIndex, moveIds, orderBy, sameIds } from "./dragSort.ts";
 
 describe("moveIds", () => {
   it("moves an item to where the target is, forwards and backwards", () => {
@@ -22,6 +22,14 @@ describe("moveIds", () => {
     const ids = ["a", "b", "c"];
     moveIds(ids, "a", "c");
     expect(ids).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("herdrIndex", () => {
+  it("is the place itself for a move back and the slot after it for a move forward", () => {
+    expect(herdrIndex(3, 1)).toBe(1);
+    expect(herdrIndex(1, 3)).toBe(4);
+    expect(herdrIndex(0, 1)).toBe(2);
   });
 });
 

@@ -212,6 +212,7 @@ export const KO: Record<string, string> = {
   "New pane to the right": "새 패널을 오른쪽에",
   "New pane below": "새 패널을 아래에",
   "New pane failed: {reason}": "새 패널 실패: {reason}",
+  "Drag to reorder": "끌어서 순서 변경",
   "Reorder failed: {reason}": "순서 바꾸기 실패: {reason}",
 
   // ---- PCs sidebar ----

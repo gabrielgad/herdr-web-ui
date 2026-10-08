@@ -214,6 +214,7 @@ export const JA: Record<string, string> = {
   "New pane to the right": "右に新しいペイン",
   "New pane below": "下に新しいペイン",
   "New pane failed: {reason}": "新しいペインを作成できませんでした: {reason}",
+  "Drag to reorder": "ドラッグで並べ替え",
   "Reorder failed: {reason}": "並べ替えできませんでした: {reason}",
 
   // ---- PCs sidebar ----

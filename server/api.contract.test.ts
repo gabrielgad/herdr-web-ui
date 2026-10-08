@@ -982,6 +982,32 @@ describe("GET /api/pane/read", () => {
   });
 });
 
+// herdr counts the index before the workspace leaves its place and inserts ahead of the one there.
+describe("POST /api/workspace/move index", () => {
+  it("lands a move forward after the target when the index names the next slot, and at the end for the list's length", async () => {
+    const owned = [] as Awaited<ReturnType<typeof workspaceCreate>>[];
+    const post = (workspace_id: string, insert_index: number) => fetch(`${base()}/api/workspace/move`, {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ workspace_id, insert_index }),
+    });
+    const all = async () => (await herdrRpc<{ snapshot: SessionSnapshot }>("session.snapshot", {})).snapshot.workspaces.map((w) => w.workspace_id);
+    try {
+      for (const name of ["a", "b", "c"]) owned.push(await workspaceCreate({ cwd: tmpdir(), label: `herdr-web-ui-test-ws-move-${name}` }));
+      const [a, b, c] = owned.map((w) => w.workspace.workspace_id) as [string, string, string];
+      const mine = async () => (await all()).filter((id) => id === a || id === b || id === c);
+      expect(await mine()).toEqual([a, b, c]);
+      // forward by one: the index after b
+      expect((await post(a, (await all()).indexOf(b) + 1)).status).toBe(200);
+      expect(await mine()).toEqual([b, a, c]);
+      // to the end: the list's length
+      expect((await post(b, (await all()).length)).status).toBe(200);
+      expect(await mine()).toEqual([a, c, b]);
+      // back: the target's own place
+      expect((await post(b, (await all()).indexOf(a))).status).toBe(200);
+      expect(await mine()).toEqual([b, a, c]);
+    } finally { for (const w of owned) await workspaceClose(w.workspace.workspace_id); }
+  });
+});
+
 describe("POST /api/pane/split", () => {
   const post = (body: unknown) => fetch(`${base()}/api/pane/split`, {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),

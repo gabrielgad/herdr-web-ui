@@ -28,6 +28,7 @@ between releases do not reach them. Remote-PC runtime bundles are versioned sepa
   [#599](https://github.com/devswha/herdr-web-ui/pull/599))
 - Tabs can be reordered. Drag a tab's grip with a finger or a mouse, or press Alt+Left/Right on a focused tab.
 - Press and hold a tab, or right-click it, for its menu, which now has New pane to the right, New pane below and New tab.
+- Workspace rows have a grip on touch screens, and a press and hold opens their menu. Moving a row down lands it after its target.
 
 ### Changed
 - The default mobile terminal key bar puts Esc, Tab and Ctrl+C first, before the held modifiers
