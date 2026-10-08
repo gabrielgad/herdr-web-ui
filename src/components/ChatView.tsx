@@ -1,5 +1,6 @@
 import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { createPortal } from "react-dom";
+import { displayTimeZone } from "../lib/timeZone.ts";
 import {
   ArrowDown, BookOpen, Check, ChevronDown, ChevronRight, Circle, CircleAlert, CircleCheck, CircleDot, CircleSlash, CircleX, Copy, Layers, Target,
   type LucideProps,
@@ -93,7 +94,7 @@ const EMPTY_STATE: ChatState = { source: "conversation", turns: [], messages: []
 function formatTime(ts: string | null): string | null {
   if (ts === null) return null;
   const date = new Date(ts);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleTimeString(currentLocale(), { hour: "2-digit", minute: "2-digit" });
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleTimeString(currentLocale(), { hour: "2-digit", minute: "2-digit", timeZone: displayTimeZone() });
 }
 
 function plainText(markdown: string): string {

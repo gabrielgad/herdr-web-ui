@@ -1363,7 +1363,7 @@ export function createServer(
           const info = await ping();
           // a forced answer (tests) and a runtime without the PTY sidecar are told the way a Windows herdr's own would be
           const herdr = attachableIdentity(info, sidecar);
-          return jsonResponse({ ok: true, herdr, auth,
+          return jsonResponse({ ok: true, herdr, auth, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             web_ui: { boot_id: process.env["HERDR_WEB_BOOT_ID"] ?? null, revision: process.env["HERDR_WEB_REVISION"] ?? null } });
         } catch (error) {
           return errorResponse(error);

@@ -237,6 +237,8 @@ export async function fetchPaneConversation(paneId: string, machineId = "local",
 export interface HealthInfo {
   ok: boolean;
   herdr: HerdrIdentity;
+  /** the zone the PC the app runs on is set to */
+  time_zone?: string;
   web_ui?: { boot_id: string | null; revision: string | null };
   /** Absent only on a server that predates the token gate. */
   auth?: HealthAuth;

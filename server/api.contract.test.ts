@@ -938,6 +938,11 @@ describe("GET /api/pane/read", () => {
     expect(health.status).toBe(200);
   });
 
+  it("names the PC's time zone in /api/health", async () => {
+    const body = (await (await fetch(`${base()}/api/health`)).json()) as { time_zone?: string };
+    expect(body.time_zone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
   it("rejects a missing pane_id parameter", async () => {
     const res = await fetch(`${base()}/api/pane/read?source=visible`);
     expect(res.status).toBe(400);

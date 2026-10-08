@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { Bell, Ellipsis, FolderOpen, Lock, Menu, MessageSquare, PanelLeft, Plus, Search, SquareTerminal, X } from "lucide-react";
 
 import type { AgentStatus, ClientRole, ServerMessage, AccessRefusal, HealthAuth, HerdrPane } from "../shared/protocol.ts";
+import { setServerTimeZone } from "./lib/timeZone.ts";
 import { ApiError, authenticate, fetchHealth, fetchBridgeHealth, fetchMachines, fetchSession, pairDevice, sendTestPush, signOut, type HealthInfo } from "./lib/api.ts";
 import { deviceLabel, takePairCode } from "./lib/phone.ts";
 import { displayPaneTitle } from "./components/Sidebar.tsx";
@@ -271,7 +272,7 @@ export function App() {
   const loadHealth = useCallback(async () => {
     try { const next = await fetchBridgeHealth(); setLocked(next.auth.required && !next.auth.authenticated); setLockReason(next.auth.reason ?? null); setAuth(next.auth); }
     catch { /* retain the gate while the connection server restarts */ }
-    try { const next = await fetchHealth(); setHealth((previous) => sameData(previous, next) ? previous : next); } catch { setHealth(null); }
+    try { const next = await fetchHealth(); setServerTimeZone(next.time_zone); setHealth((previous) => sameData(previous, next) ? previous : next); } catch { setHealth(null); }
   }, []);
   const snapshotRequests = useRef(new SnapshotRequests());
   const load = useCallback(async () => {
