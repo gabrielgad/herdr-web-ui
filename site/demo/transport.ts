@@ -512,6 +512,11 @@ async function route(url: URL, method: string, init: RequestInit | undefined, in
     structureChanged();
     return json({ ok: true });
   }
+  if (path === "/api/pane/split") {
+    const body = await bodyOf(init, input);
+    if (!snapshot().panes.some((p) => p.pane_id === body["pane_id"])) return error("pane_not_found", "no such pane", 404);
+    return json({ ok: true, pane_id: "demo:p-split" });
+  }
   if (path === "/api/tab/move") {
     const body = await bodyOf(init, input);
     const snap = snapshot();

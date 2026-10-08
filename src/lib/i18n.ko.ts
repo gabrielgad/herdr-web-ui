@@ -209,6 +209,9 @@ export const KO: Record<string, string> = {
   "Rename failed: {reason}": "이름 바꾸기 실패: {reason}",
   "Reorder tab {name}": "탭 {name} 순서 변경",
   "Drag to reorder · Alt+←/→": "끌어서 순서 변경 · Alt+←/→",
+  "New pane to the right": "새 패널을 오른쪽에",
+  "New pane below": "새 패널을 아래에",
+  "New pane failed: {reason}": "새 패널 실패: {reason}",
   "Reorder failed: {reason}": "순서 바꾸기 실패: {reason}",
 
   // ---- PCs sidebar ----

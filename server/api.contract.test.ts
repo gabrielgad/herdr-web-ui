@@ -352,7 +352,7 @@ describe("phone access", () => {
 describe("mutation body validation", () => {
   it("rejects non-object JSON without touching herdr or losing the error envelope", async () => {
     for (const path of [
-      "/api/workspace/create", "/api/tab/create", "/api/tab/rename", "/api/tab/close", "/api/tab/move", "/api/workspace/rename", "/api/workspace/move", "/api/workspace/close",
+      "/api/workspace/create", "/api/tab/create", "/api/tab/rename", "/api/tab/close", "/api/tab/move", "/api/pane/split", "/api/workspace/rename", "/api/workspace/move", "/api/workspace/close",
       "/api/pane/rename", "/api/pane/input", "/api/pane/keys", "/api/pane/close", "/api/pane/image",
       "/api/pane/scroll",
     ]) {
@@ -979,6 +979,51 @@ describe("GET /api/pane/read", () => {
   it("rejects a missing pane_id parameter", async () => {
     const res = await fetch(`${base()}/api/pane/read?source=visible`);
     expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/pane/split", () => {
+  const post = (body: unknown) => fetch(`${base()}/api/pane/split`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+  });
+
+  it("validates the pane and the direction before touching herdr", async () => {
+    for (const pane_id of [undefined, null, "", 1, true]) {
+      const res = await post({ pane_id, direction: "right" });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ApiError).error.code).toBe("missing_pane_id");
+    }
+    for (const direction of [undefined, null, "left", "up", 1]) {
+      const res = await post({ pane_id: "unknown:p9", direction });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ApiError).error.code).toBe("invalid_direction");
+    }
+    expect((await fetch(`${base()}/api/pane/split`)).status).toBe(400);
+  });
+
+  it("splits an owned pane into a new shell pane of the same tab, to the right and below, without moving focus", async () => {
+    const owned = await workspaceCreate({ cwd: tmpdir(), label: "herdr-web-ui-test-pane-split" });
+    const id = owned.workspace.workspace_id;
+    try {
+      const panesOf = async () => (await herdrRpc<{ snapshot: SessionSnapshot }>("session.snapshot", {})).snapshot.panes.filter((p) => p.workspace_id === id);
+      for (const direction of ["right", "down"] as const) {
+        const res = await post({ pane_id: owned.root_pane.pane_id, direction });
+        expect(res.status).toBe(200);
+        const body = await res.json() as { ok: boolean; pane_id: string };
+        expect(body.ok).toBe(true);
+        const created = (await panesOf()).find((p) => p.pane_id === body.pane_id);
+        expect(created?.tab_id).toBe(owned.tab.tab_id);
+        expect(created?.agent ?? null).toBeNull();
+      }
+      expect(await panesOf()).toHaveLength(3);
+      const alias = await fetch(`${base()}/api/machines/local/pane/split`, {
+        method: "POST", headers: { "content-type": "application/json", "x-herdr-machine": "1" }, body: JSON.stringify({ pane_id: owned.root_pane.pane_id, direction: "right" }),
+      });
+      expect(alias.status).toBe(200);
+      expect(await panesOf()).toHaveLength(4);
+      const missing = await post({ pane_id: "unknown:p9", direction: "right" });
+      expect(missing.status).toBe(404);
+    } finally { await workspaceClose(id); }
   });
 });
 
@@ -2381,7 +2426,7 @@ it("refuses cross-origin changes while allowing same-origin and CLI requests", a
   const base = `http://127.0.0.1:${instance.port}`;
   const created = await workspaceCreate({ cwd: root, label: "herdr-web-ui-test-origin" });
   try {
-    for (const path of ["pane/input", "pane/keys", "pane/close", "workspace/create", "tab/create", "tab/rename", "tab/close", "tab/move", "push/subscribe"]) {
+    for (const path of ["pane/input", "pane/keys", "pane/close", "workspace/create", "tab/create", "tab/rename", "tab/close", "tab/move", "pane/split", "push/subscribe"]) {
       const response = await fetch(`${base}/api/${path}`, { method: "POST", headers: { origin: "http://other.example", "content-type": "text/plain" }, body: JSON.stringify({ pane_id: created.root_pane.pane_id, text: "must not type", keys: ["Enter"] }) });
       expect(response.status).toBe(403);
       expect(await response.json()).toMatchObject({ error: { code: "invalid_origin" } });

@@ -211,6 +211,9 @@ export const JA: Record<string, string> = {
   "Rename failed: {reason}": "名前を変更できませんでした: {reason}",
   "Reorder tab {name}": "タブ {name} を並べ替え",
   "Drag to reorder · Alt+←/→": "ドラッグで並べ替え · Alt+←/→",
+  "New pane to the right": "右に新しいペイン",
+  "New pane below": "下に新しいペイン",
+  "New pane failed: {reason}": "新しいペインを作成できませんでした: {reason}",
   "Reorder failed: {reason}": "並べ替えできませんでした: {reason}",
 
   // ---- PCs sidebar ----

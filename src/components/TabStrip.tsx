@@ -12,7 +12,7 @@
  * costs more than the tab: an agent still at work in it, or the workspace's last tab.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import { ChevronDown, GripVertical, Pencil, Plus, Terminal, X } from "lucide-react";
+import { ChevronDown, Columns2, GripVertical, Pencil, Plus, Rows2, Terminal, X } from "lucide-react";
 
 import "./TabStrip.css";
 
@@ -21,7 +21,7 @@ import { ApiError } from "../lib/api.ts";
 import { useFacesArrived } from "../lib/fontFaces.ts";
 import { focusWorkspaceListToggle } from "../lib/focus.ts";
 import { useT } from "../lib/i18n.ts";
-import { orderBy, useDragSort, useOptimisticOrder } from "../lib/dragSort.ts";
+import { orderBy, useDragSort, useHold, useOptimisticOrder } from "../lib/dragSort.ts";
 import { customTabLabel, tabLabel } from "../lib/tabName.ts";
 import { STRIP_AT_REST, stripPlaced, stripScrolled, stripSelected, type StripScroll } from "../lib/tabStripScroll.ts";
 import { PANE_TABPANEL_ID, paneTabPanelLabel } from "../lib/paneRegion.ts";
@@ -49,7 +49,7 @@ export interface TabStripProps {
 export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNewTab }: TabStripProps) {
   const t = useT();
   const machineId = useMachineId();
-  const { closeTab, moveTab, renameTab } = useMachineApi();
+  const { closeTab, moveTab, renameTab, splitPane } = useMachineApi();
   const strip = useRef<HTMLDivElement>(null);
   const [picker, setPicker] = useState<{ anchor: HTMLElement; tab: HerdrTab } | null>(null);
   const [editing, setEditing] = useState<{ tabId: string; value: string } | null>(null);
@@ -72,6 +72,11 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
   const order = useOptimisticOrder(serverTabs.map((tab) => tab.tab_id), moveTab, (reason) => setError(t("Reorder failed: {reason}", { reason: said(reason) })));
   const tabs = orderBy(serverTabs, (tab) => tab.tab_id, order.ids);
   const sort = useDragSort("tabs", order.move);
+  // a press and hold on a touch screen, and a right-click, open the tab's menu
+  const hold = useHold((element) => {
+    const tab = tabs.find((candidate) => candidate.tab_id === element.dataset["tabId"]);
+    if (tab) setPicker({ anchor: element, tab });
+  });
   const nameOf = (tab: HerdrTab): string => sent?.tabId === tab.tab_id ? sent.label : tabLabel(tab, t, tabs.findIndex((candidate) => candidate.tab_id === tab.tab_id) + 1);
 
   useEffect(() => {
@@ -247,11 +252,18 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
     setPicker(picker?.tab.tab_id === tab.tab_id ? null : { anchor: event.currentTarget, tab });
   };
 
-  // a tab's menu: its panes when it has several, then its name and its close
+  // a new shell pane beside or below the tab's pane, in the same tab
+  const split = (paneId: string, direction: "right" | "down"): void => {
+    setError(null);
+    void splitPane(paneId, direction).catch((reason: unknown) => setError(t("New pane failed: {reason}", { reason: said(reason) })));
+  };
+
+  // a tab's menu: its panes when it has several, new panes in it, then its name and its close
   const pickerItems = (tab: HerdrTab): RowMenuItem[] => {
     // the tab may have changed under the open menu: the items act on what it is now
     const now = tabs.find((candidate) => candidate.tab_id === tab.tab_id) ?? tab;
     const own = panesOf(now);
+    const target = paneFor(now);
     return [
       ...(own.length > 1 ? own.map((pane) => ({
         id: pane.pane_id,
@@ -261,7 +273,12 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
         current: pane.pane_id === selectedPane.pane_id,
         run: () => onSelectPane(pane.pane_id),
       })) : []),
-      { id: "rename-tab", label: t("Rename tab"), icon: Pencil, divider: own.length > 1, run: () => beginRename(now) },
+      ...(target ? [
+        { id: "split-right", label: t("New pane to the right"), icon: Columns2, divider: own.length > 1, run: () => split(target.pane_id, "right") },
+        { id: "split-down", label: t("New pane below"), icon: Rows2, run: () => split(target.pane_id, "down") },
+      ] satisfies RowMenuItem[] : []),
+      { id: "new-tab", label: t("New tab"), icon: Plus, run: onNewTab },
+      { id: "rename-tab", label: t("Rename tab"), icon: Pencil, divider: true, run: () => beginRename(now) },
       { id: "close-tab", label: t("Close tab"), icon: X, danger: true, divider: true, run: () => requestClose(now) },
     ];
   };
@@ -321,7 +338,7 @@ export function TabStrip({ snapshot, workspace, selectedPane, onSelectPane, onNe
                     if (pane && pane.pane_id !== selectedPane.pane_id) onSelectPane(pane.pane_id);
                   }}
                   onDoubleClick={() => beginRename(tab)}
-                  onContextMenu={(event) => { event.preventDefault(); openPicker(event, tab); }}
+                  {...hold}
                   // the middle button closes a tab, as it does a browser's
                   onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); requestClose(tab); } }}
                 >

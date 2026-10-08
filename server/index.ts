@@ -45,6 +45,7 @@ import {
   sessionSnapshot,
   tabClose,
   tabCreate,
+  paneSplit,
   tabMove,
   tabRename,
   workspaceClose,
@@ -1650,6 +1651,27 @@ export function createServer(
           await tabMove(payload.tab_id, payload.insert_index);
           broadcastAll({ type: "session-changed" });
           return jsonResponse({ ok: true });
+        } catch (error) {
+          return errorResponse(error);
+        }
+      }
+
+      // herdr's pane.split: another shell pane beside or below the given one, in the same tab
+      if (pathname === "/api/pane/split") {
+        if (request.method !== "POST") return badRequest("method_not_allowed", "use POST");
+        let payload: { pane_id?: unknown; direction?: unknown };
+        try {
+          payload = (await request.json()) as typeof payload;
+        } catch {
+          return badRequest("invalid_json", "request body must be JSON");
+        }
+        if (!isJsonObject(payload)) return badRequest("invalid_body", "request body must be a JSON object");
+        if (typeof payload.pane_id !== "string" || payload.pane_id.length === 0) return badRequest("missing_pane_id", "pane_id is required");
+        if (payload.direction !== "right" && payload.direction !== "down") return badRequest("invalid_direction", "direction must be right or down");
+        try {
+          const split = await paneSplit(payload.pane_id, payload.direction);
+          broadcastAll({ type: "session-changed" });
+          return jsonResponse({ ok: true, pane_id: split.pane.pane_id });
         } catch (error) {
           return errorResponse(error);
         }

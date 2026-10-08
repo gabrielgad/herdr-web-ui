@@ -27,6 +27,7 @@ between releases do not reach them. Remote-PC runtime bundles are versioned sepa
   ([Anonymous usage counts](docs/guide.md#anonymous-usage-counts),
   [#599](https://github.com/devswha/herdr-web-ui/pull/599))
 - Tabs can be reordered. Drag a tab's grip with a finger or a mouse, or press Alt+Left/Right on a focused tab.
+- Press and hold a tab, or right-click it, for its menu, which now has New pane to the right, New pane below and New tab.
 
 ### Changed
 - The default mobile terminal key bar puts Esc, Tab and Ctrl+C first, before the held modifiers

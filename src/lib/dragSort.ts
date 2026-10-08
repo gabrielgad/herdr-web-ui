@@ -1,7 +1,8 @@
 /**
- * Touch-and-mouse reordering. The browser's drag-and-drop does not start on a touch screen, so a
- * grip is dragged with pointer events: the item under the finger when it lifts is where the
- * dragged one lands. Items carry `data-sort-group` and `data-sort-id`; the grip carries the handlers.
+ * Touch-and-mouse reordering and press-and-hold. The browser's drag-and-drop does not start on a
+ * touch screen, so a grip is dragged with pointer events: the item under the finger when it lifts
+ * is where the dragged one lands. Items carry `data-sort-group` and `data-sort-id`; the grip
+ * carries the handlers.
  */
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 
@@ -105,4 +106,52 @@ export function useDragSort(group: string, onDrop: (id: string, targetId: string
     onClick: (event) => { event.stopPropagation(); },
   });
   return { draggingId, overId, grip };
+}
+
+const HOLD_MS = 450;
+const HOLD_SLOP_PX = 10;
+
+/**
+ * Press and hold on a touch screen (or a pen), and the right button of a mouse: `onHold` gets the
+ * element held, for a menu to anchor to. A finger that moves is a scroll, not a hold. The click
+ * that ends a hold is swallowed, so the row under the finger does not also open.
+ */
+export function useHold(onHold: (element: HTMLElement) => void) {
+  const timer = useRef<number | undefined>(undefined);
+  const origin = useRef<{ x: number; y: number } | null>(null);
+  const heldAt = useRef(0);
+  const cancel = (): void => {
+    if (timer.current !== undefined) window.clearTimeout(timer.current);
+    timer.current = undefined;
+    origin.current = null;
+  };
+  useEffect(() => cancel, []);
+  const fire = (element: HTMLElement): void => {
+    if (Date.now() - heldAt.current < 800) return;
+    heldAt.current = Date.now();
+    cancel();
+    onHold(element);
+  };
+  return {
+    onPointerDown: (event: PointerEvent<HTMLElement>): void => {
+      if (event.pointerType === "mouse") return;
+      const element = event.currentTarget;
+      origin.current = { x: event.clientX, y: event.clientY };
+      timer.current = window.setTimeout(() => fire(element), HOLD_MS);
+    },
+    onPointerMove: (event: PointerEvent<HTMLElement>): void => {
+      const start = origin.current;
+      if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > HOLD_SLOP_PX) cancel();
+    },
+    onPointerUp: cancel,
+    onPointerCancel: cancel,
+    onPointerLeave: cancel,
+    onContextMenu: (event: MouseEvent<HTMLElement>): void => {
+      event.preventDefault();
+      fire(event.currentTarget);
+    },
+    onClickCapture: (event: MouseEvent<HTMLElement>): void => {
+      if (Date.now() - heldAt.current < 800) { event.preventDefault(); event.stopPropagation(); }
+    },
+  };
 }

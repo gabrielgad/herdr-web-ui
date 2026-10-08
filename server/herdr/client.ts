@@ -209,6 +209,11 @@ export async function tabRename(tabId: string, label: string, socketPath?: strin
   await herdrRpc("tab.rename", { tab_id: tabId, label }, socketPath);
 }
 
+/** Splits the pane: the new pane is a shell in the same folder, beside (`right`) or below (`down`) it. */
+export async function paneSplit(paneId: string, direction: "right" | "down", socketPath?: string): Promise<{ pane: { pane_id: string } }> {
+  return herdrRpc("pane.split", { target_pane_id: paneId, direction, focus: false }, socketPath);
+}
+
 /** Places the tab at `insertIndex` among its workspace's tabs: herdr's own tab order. */
 export async function tabMove(tabId: string, insertIndex: number, socketPath?: string): Promise<void> {
   await herdrRpc("tab.move", { tab_id: tabId, insert_index: insertIndex }, socketPath);

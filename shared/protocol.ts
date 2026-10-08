@@ -106,6 +106,8 @@ export type { Machine, MachineEvent, PaneTarget, SetupJob, SetupRequest, SetupAc
  *         a workspace's last tab takes the workspace with it)
  *  POST   /api/tab/move   { tab_id, insert_index } -> { ok: true } (tab.move: the tab's place among its
  *         workspace's tabs; herdr's order is the snapshot's, not `number`, which stays with the tab)
+ *  POST   /api/pane/split { pane_id, direction: "right" | "down" } -> { ok: true, pane_id } (pane.split:
+ *         a new shell pane in the same tab and folder, beside or below that pane; focus stays)
  *  POST   /api/workspace/rename { workspace_id, label } -> { ok: true }
  *  POST   /api/workspace/move   { workspace_id, insert_index } -> { ok: true } (sidebar reorder)
  *  POST   /api/workspace/close  { workspace_id, close_group? } -> { ok: true } (close_group takes the

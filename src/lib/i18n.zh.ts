@@ -213,6 +213,9 @@ export const ZH: Record<string, string> = {
   "Rename failed: {reason}": "重命名失败：{reason}",
   "Reorder tab {name}": "重新排序标签页 {name}",
   "Drag to reorder · Alt+←/→": "拖动以重新排序 · Alt+←/→",
+  "New pane to the right": "在右侧新建窗格",
+  "New pane below": "在下方新建窗格",
+  "New pane failed: {reason}": "新建窗格失败：{reason}",
   "Reorder failed: {reason}": "调整顺序失败：{reason}",
 
   // ---- PCs sidebar ----

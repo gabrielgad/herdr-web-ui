@@ -1265,7 +1265,7 @@ try {
   await strip.getByRole("tab", { name: "second", exact: true }).click({ button: "right" });
   const tabMenu = page.getByRole("menu", { name: "second", exact: true });
   await tabMenu.waitFor();
-  assert.deepEqual(await tabMenu.getByRole("menuitem").allTextContents(), ["Rename tab", "Close tab"]);
+  assert.deepEqual(await tabMenu.getByRole("menuitem").allTextContents(), ["New pane to the right", "New pane below", "New tab", "Rename tab", "Close tab"]);
   await tabMenu.getByRole("menuitem", { name: "Rename tab", exact: true }).click();
   await tabName.fill("build");
   await page.keyboard.press("Enter");
@@ -1283,7 +1283,7 @@ try {
   await phoneStrip.getByRole("button", { name: "Actions for build", exact: true }).tap();
   const tabSheet = tabPhonePage.getByRole("dialog", { name: "build", exact: true });
   await tabSheet.waitFor();
-  assert.deepEqual(await tabSheet.locator(".row-sheet-item").allTextContents(), ["Rename tab", "Close tab"]);
+  assert.deepEqual(await tabSheet.locator(".row-sheet-item").allTextContents(), ["New pane to the right", "New pane below", "New tab", "Rename tab", "Close tab"]);
   await tabSheet.getByRole("button", { name: "Cancel", exact: true }).tap();
   await tabSheet.waitFor({ state: "detached" });
   await tabPhone.close();

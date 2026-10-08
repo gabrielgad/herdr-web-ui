@@ -460,6 +460,12 @@ export async function renameTab(tabId: string, label: string, machineId = "local
   await sendJson(machinePath(machineId, "tab/rename"), "POST", { tab_id: tabId, label });
 }
 
+/** POST /api/pane/split: a new shell pane beside (`right`) or below (`down`) the pane; resolves with its id. */
+export async function splitPane(paneId: string, direction: "right" | "down", machineId = "local"): Promise<string> {
+  const response = await sendJson(machinePath(machineId, "pane/split"), "POST", { pane_id: paneId, direction });
+  return ((await response.json()) as { pane_id: string }).pane_id;
+}
+
 /** POST /api/tab/move: places the tab at `insertIndex` among its workspace's tabs, in herdr's order. */
 export async function moveTab(tabId: string, insertIndex: number, machineId = "local"): Promise<void> {
   await sendJson(machinePath(machineId, "tab/move"), "POST", { tab_id: tabId, insert_index: insertIndex });
