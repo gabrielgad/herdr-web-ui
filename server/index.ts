@@ -1186,7 +1186,7 @@ export function createServer(
       let status = completions.observe(paneId, raw, omo.runs(paneId) ? "omo" : agent);
       if (status === "done") herdrDone.add(paneId); else { herdrDone.delete(paneId); openedDone.delete(paneId); }
       // finished with a browser looking at the pane: seen at once, so it never shows done
-      if (status === "done" && watched(paneId)) { completions.seen(paneId); openedDone.add(paneId); status = "idle"; }
+      if (status === "done" && viewed(paneId)) { completions.seen(paneId); openedDone.add(paneId); status = "idle"; }
       pending.status(paneId, status); drainPending(paneId);
       broadcastAll({ type: "pane-status", pane_id: paneId, agent_status: status });
       push.onStatus(paneId, status).catch(logPushError);

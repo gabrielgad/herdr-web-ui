@@ -1814,8 +1814,12 @@ describe("web push", () => {
       bridge = createServer({ port: 0, hostname: "127.0.0.1", token: "", stateDir: dir, machines: false });
       watcher = await RecordingSocket.connect(`ws://127.0.0.1:${bridge.port}/ws`);
       other = await RecordingSocket.connect(`ws://127.0.0.1:${bridge.port}/ws`);
-      const shownStatus = async () => ((await (await fetch(`http://127.0.0.1:${bridge!.port}/api/session`)).json()) as { snapshot: SessionSnapshot })
-        .snapshot.panes.find((pane) => pane.pane_id === paneId)?.agent_status;
+      const shownSnapshot = async () => ((await (await fetch(`http://127.0.0.1:${bridge!.port}/api/session`)).json()) as { snapshot: SessionSnapshot }).snapshot;
+      const shownStatus = async () => (await shownSnapshot()).panes.find((pane) => pane.pane_id === paneId)?.agent_status;
+      const shownTabStatus = async () => {
+        const snapshot = await shownSnapshot();
+        return snapshot.tabs.find((tab) => tab.tab_id === snapshot.panes.find((pane) => pane.pane_id === paneId)?.tab_id)?.agent_status;
+      };
       const pushed = (socket: RecordingSocket, status: string) => socket.seen.some((message) => message.type === "pane-status" && message.pane_id === paneId && message.agent_status === status);
       const report = async (state: string, expected: string) => {
         watcher!.seen.length = 0;
@@ -1829,6 +1833,7 @@ describe("web push", () => {
       await report("working", "working");
       await report("idle", "done");
       expect(await shownStatus()).toBe("done");
+      expect(await shownTabStatus()).toBe("done");
 
       // attached alone is not looking: still done
       watcher.send({ type: "attach", pane_id: paneId, cols: 100, rows: 30 });
@@ -1848,6 +1853,7 @@ describe("web push", () => {
       await watcher.waitFor((message) => message.type === "pane-status" && message.pane_id === paneId && message.agent_status === "idle",
         "idle once viewed", 5_000);
       expect(await shownStatus()).toBe("idle");
+      expect(await shownTabStatus()).toBe("idle");
 
       // finishing while looked at: straight to ready, never done
       await report("working", "working");

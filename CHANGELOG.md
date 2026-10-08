@@ -73,6 +73,7 @@ between releases do not reach them. Remote-PC runtime bundles are versioned sepa
   pane or a view yourself and it is back. A shell's notification opens its terminal as before.
   ([#605](https://github.com/devswha/herdr-web-ui/pull/605) by @Xianbei233)
 - A finished pane reads **Ready**, not **Done**, once you look at it in the browser.
+- The tab and workspace of a pane you have looked at read **Ready** too, not **Done**.
 
 ## [0.4.1] - 2026-10-08
 
